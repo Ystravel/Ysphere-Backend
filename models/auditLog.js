@@ -1,35 +1,35 @@
 import { Schema, model, ObjectId } from 'mongoose'
 
 const auditLogSchema = new Schema({
-  userId: {
+  operatorId: { // 操作人員的 ID
     type: ObjectId,
     ref: 'users',
-    required: false
+    default: null // 預設允許為 null
   },
-  action: { //做什麼類型的操作
+  action: { // 執行的操作類型
     type: String,
-    enum: ['創建', '修改', '刪除'],
+    enum: ['創建', '修改', '刪除', '登出'],
     required: true
   },
-  targetId: {
+  targetId: { // 操作目標的 ID
     type: ObjectId,
-    required: true,
-    refPath: 'targetModel'
+    ref: 'users',
+    required: true
   },
-  targetModel: { //針對什麼要做操作
+  targetModel: { // 操作目標的模型類型
     type: String,
     enum: ['users', 'departments', 'companies', 'assets'],
     required: true
   },
-  changes: { //具體變更什麼
-    type: Map, 
-    of: String, 
-    default: null // 用於儲存被修改的欄位和新值
+  changes: { // 具體修改內容
+    type: Map,
+    of: String,
+    default: null
   },
-  createdAt: { //什麼時候做這操作
+  createdAt: { // 操作時間
     type: Date,
     default: Date.now
   }
 })
 
-export default model('auditLogs', auditLogSchema)
+export default model('AuditLog', auditLogSchema)

@@ -1,4 +1,4 @@
-import { Schema, model, ObjectId } from 'mongoose';
+import { Schema, model, ObjectId } from 'mongoose'
 
 const companySchema = new Schema({
   name: {
@@ -10,6 +10,6 @@ const companySchema = new Schema({
     type: ObjectId,
     ref: 'departments' // 參照 department 模型
   }]
-});
+})
 
-export default model('companies', companySchema);
+export default model('companies', companySchema)

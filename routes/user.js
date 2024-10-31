@@ -20,8 +20,7 @@ const router = Router()
 router.post('/login', auth.login, login)
 
 // 用戶註冊（僅限 ADMIN 和 SUPER_ADMIN）
-router.post('/', create)
-// auth.jwt, checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+router.post('/', auth.jwt, checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]), create)
 
 // 延長登入 token
 router.patch('/extend', auth.jwt, extend)
