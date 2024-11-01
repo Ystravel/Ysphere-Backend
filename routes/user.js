@@ -7,12 +7,11 @@ import {
   extend,
   logout,
   profile,
-  googleCallback
+  googleLogin
 } from '../controllers/user.js'
 import * as auth from '../middlewares/auth.js'
 import checkRole from '../middlewares/checkRole.js'
 import UserRole from '../enums/UserRole.js'
-import passport from 'passport'
 
 const router = Router()
 
@@ -34,9 +33,8 @@ router.get('/profile', auth.jwt, profile)
 // 用戶登出
 router.delete('/logout', auth.jwt, logout)
 
-// Google 登入相關路由
-router.get('/auth/google', passport.authenticate('google', { scope: ['profile', 'email'] }))
-router.get('/auth/google/callback', auth.googleLogin, googleCallback)
+// Google 登入
+router.post('/google-login', googleLogin)
 
 // 編輯用戶資料（僅限 ADMIN 和 SUPER_ADMIN）
 router.patch('/:id', auth.jwt, checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN]), edit)

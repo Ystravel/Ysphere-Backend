@@ -1,10 +1,11 @@
 import User from '../models/user.js'
 import { StatusCodes } from 'http-status-codes'
+import { OAuth2Client } from 'google-auth-library'
 import jwt from 'jsonwebtoken'
 import validator from 'validator'
-import bcrypt from 'bcrypt'
 import Sequence from '../models/sequence.js'
 import AuditLog from '../models/auditLog.js'
+import Department from '../models/department.js'
 
 const getNextSequence = async (name) => {
   const sequence = await Sequence.findOneAndUpdate(
@@ -19,13 +20,27 @@ export const create = async (req, res) => {
   try {
     const sequenceValue = await getNextSequence('user')
     const userId = `${String(sequenceValue).padStart(4, '0')}`
-    const result = await User.create({ ...req.body, userId, department: req.body.department })
 
-    // 異動紀錄：如果 `req.user` 不存在則設定 `operatorId` 為 null
+    // 從請求中提取 department ID
+    const { department } = req.body
+    const departmentData = await Department.findById(department)
+
+    if (!departmentData) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: '找不到選定的部門' })
+    }
+
+    // 使用部門的 companyId 設定用戶的公司欄位
+    const result = await User.create({
+      ...req.body,
+      userId,
+      department,
+      companyId: departmentData.companyId // 新增用戶的 companyId
+    })
+
     await AuditLog.create({
-      operatorId: req.user ? req.user._id : null, // 操作者 ID
+      operatorId: req.user ? req.user._id : null,
       action: '創建',
-      targetId: result._id, // 目標用戶 ID
+      targetId: result._id,
       targetModel: 'users',
       changes: { ...req.body, userId }
     })
@@ -36,7 +51,7 @@ export const create = async (req, res) => {
       result
     })
   } catch (error) {
-    console.error('Create user error:', error) // 增加錯誤日誌
+    console.error('Create user error:', error)
     handleError(res, error)
   }
 }
@@ -67,25 +82,65 @@ export const login = async (req, res) => {
   }
 }
 
-// Google 登入回調
-export const googleCallback = async (req, res) => {
+const oauth2Client = new OAuth2Client(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  'postmessage' // 重要：使用 postmessage 作為重導向 URI
+)
+// Google 驗證回調
+export const googleLogin = async (req, res) => {
   try {
-    if (!req.user) {
-      // 未註冊的用戶重定向至前端，並在 URL 中包含錯誤訊息
-      return res.redirect(`http://localhost:3000/login?message=${encodeURIComponent('此Email尚未註冊，請聯絡人資')}`)
+    const { code } = req.body
+
+    // 使用授權碼獲取 tokens
+    const { tokens } = await oauth2Client.getToken(code)
+    const idToken = tokens.id_token
+
+    // 驗證 ID Token
+    const ticket = await oauth2Client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID
+    })
+
+    const payload = ticket.getPayload()
+    const email = payload.email
+
+    // 查找用戶
+    const user = await User.findOne({ email })
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: '此Email尚未註冊,請聯絡人資'
+      })
     }
 
-    // 為已註冊用戶生成 JWT token
-    const token = jwt.sign({ _id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7 days' })
-    req.user.tokens.push(token)
-    await req.user.save()
+    // 生成 JWT
+    const jwtToken = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: '7 days'
+    })
 
-    // 將成功的登入資訊重定向至前端，並包含 token、email 等資訊
-    res.redirect(`http://localhost:3000/login?token=${token}&email=${req.user.email}&name=${req.user.name}&role=${req.user.role}`)
+    // 保存 token
+    user.tokens.push(jwtToken)
+    await user.save()
+
+    res.status(200).json({
+      success: true,
+      message: '登入成功',
+      result: {
+        token: jwtToken,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        userId: user.userId
+      }
+    })
   } catch (error) {
-    console.error(error)
-    // 若發生錯誤，將用戶重定向至前端，並顯示錯誤訊息
-    res.redirect(`http://localhost:3000/login?message=${encodeURIComponent('未知錯誤，請稍後再試')}`)
+    console.error('Google驗證錯誤:', error)
+    res.status(500).json({
+      success: false,
+      message: 'Google驗證失敗',
+      error: error.message
+    })
   }
 }
 
@@ -131,18 +186,29 @@ export const getAll = async (req, res) => {
     const itemsPerPage = req.query.itemsPerPage * 1 || 10
     const page = req.query.page * 1 || 1
     const regex = new RegExp(req.query.search || '', 'i')
+    const roleFilter = req.query.role
+
     const query = {
       $or: [
         { name: regex },
         { email: regex },
-        { userId: regex }
+        { userId: regex },
+        { cellphone: regex }
       ]
+    }
+
+    if (roleFilter !== undefined && roleFilter !== null && roleFilter !== '') {
+      query.role = Number(roleFilter)
     }
 
     const totalItems = await User.countDocuments(query)
     const data = await User
       .find(query)
-      // .populate('department', 'name')
+      .populate({
+        path: 'department',
+        select: 'name companyId',
+        populate: { path: 'companyId', select: 'name' } // 透過公司ID查詢公司名稱
+      })
       .sort({ [sortBy]: sortOrder })
       .skip((page - 1) * itemsPerPage)
       .limit(itemsPerPage)
@@ -195,17 +261,25 @@ export const edit = async (req, res) => {
     const updateData = { ...req.body }
     delete updateData.password
 
+    // 如果部門更改，重新取得對應的公司ID
+    if (req.body.department) {
+      const departmentData = await Department.findById(req.body.department)
+      if (!departmentData) {
+        return res.status(StatusCodes.BAD_REQUEST).json({ message: '找不到選定的部門' })
+      }
+      updateData.companyId = departmentData.companyId
+    }
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true, runValidators: true }
     ).orFail(new Error('NOT FOUND'))
 
-    // 記錄修改異動，指定操作者和目標用戶
     await AuditLog.create({
-      operatorId: req.user._id, // 操作者 ID
+      operatorId: req.user._id,
       action: '修改',
-      targetId: user._id, // 目標用戶 ID
+      targetId: user._id,
       targetModel: 'users',
       changes: updateData
     })

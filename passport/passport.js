@@ -3,6 +3,7 @@ import passportLocal from 'passport-local'
 import passportJWT from 'passport-jwt'
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20'
 import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
 import User from '../models/user.js'
 
 passport.use('login', new passportLocal.Strategy({
@@ -59,26 +60,5 @@ passport.use('jwt', new passportJWT.Strategy({
     } else {
       return done(null, null, { message: '未知錯誤' })
     }
-  }
-}))
-
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: 'http://localhost:4001/user/auth/google/callback'
-}, async (accessToken, refreshToken, profile, done) => {
-  try {
-    // 查找是否有相同的 email
-    const user = await User.findOne({ email: profile.emails[0].value })
-
-    if (!user) {
-      // 如果沒有找到用戶，返回錯誤並要求聯絡人資
-      return done(null, null, { message: '此Email尚未被註冊，請聯絡人資' })
-    }
-
-    // 如果找到用戶，允許登入
-    return done(null, user)
-  } catch (error) {
-    return done(error, null)
   }
 }))

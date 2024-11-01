@@ -3,20 +3,6 @@ import validator from 'validator'
 import bcrypt from 'bcrypt'
 import UserRole from '../enums/UserRole.js'
 
-// const emergencyContactSchema = new Schema({
-//   name: {
-//     type: String,
-//     required: [true, '請輸入緊急聯絡人姓名']
-//   },
-//   cellphone: {
-//     type: String,
-//     required: [true, '請輸入緊急連絡人聯絡號碼']
-//   },
-//   relationship: {
-//     type: String
-//   }
-// })
-
 const schema = new Schema({
   email: {
     type: String,
@@ -66,11 +52,11 @@ const schema = new Schema({
   address: {
     type: String
   },
-  // department: {
-  //   type: ObjectId,
-  //   ref: 'departments',
-  //   // default: 'IT部門'
-  // },
+  department: {
+    type: ObjectId,
+    ref: 'departments',
+    required: true
+  },
   role: {
     type: Number,
     default: UserRole.USER
@@ -81,7 +67,7 @@ const schema = new Schema({
   },
   employmentStatus: {
     type: String,
-    enum: ['在職','離職','退休','留職停薪'],
+    enum: ['在職', '離職', '退休', '留職停薪'],
     default: '在職'
   },
   hireDate: {
@@ -101,7 +87,7 @@ const schema = new Schema({
     required: [true, '請輸入緊急聯絡人連絡電話']
   },
   emergencyRelationship: {
-    type: String,
+    type: String
   },
   // company: {
   //   type: ObjectId,
@@ -117,7 +103,7 @@ const schema = new Schema({
   },
   tokens: {
     type: [String]
-  },
+  }
 }, {
   timestamps: true, // 使用者帳號建立時間、更新時間
   versionKey: false

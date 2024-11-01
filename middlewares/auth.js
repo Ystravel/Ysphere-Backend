@@ -59,15 +59,3 @@ export const jwt = (req, res, next) => {
     next()
   })(req, res, next)
 }
-
-// googleLogin 中的處理
-export const googleLogin = (req, res, next) => {
-  passport.authenticate('google', { session: false }, (error, user, info) => {
-    if (!user || error) {
-      // 用戶不存在，重定向回前端並顯示錯誤訊息
-      return res.redirect(`http://localhost:3000/login?message=${encodeURIComponent(info?.message || '')}`)
-    }
-    req.user = user
-    next() // 認證成功，繼續處理 callback 邏輯
-  })(req, res, next)
-}
