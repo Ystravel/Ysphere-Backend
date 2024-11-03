@@ -235,15 +235,6 @@ export const logout = async (req, res) => {
     req.user.tokens = req.user.tokens.filter(token => token !== req.token)
     await req.user.save()
 
-    // 記錄登出異動
-    await AuditLog.create({
-      userId: req.user._id,
-      action: '登出',
-      targetId: req.user._id,
-      targetModel: 'users',
-      changes: {}
-    })
-
     res.status(StatusCodes.OK).json({
       success: true,
       message: '登出成功'
@@ -308,7 +299,7 @@ const handleError = (res, error) => {
   } else if (error.name === 'MongoServerError' && error.code === 11000) {
     res.status(StatusCodes.CONFLICT).json({
       success: false,
-      message: '此Email已註冊'
+      message: 'Email、身分證、手機、分機號碼或列印編號已註冊'
     })
   } else if (error.message === 'ID') {
     res.status(StatusCodes.BAD_REQUEST).json({

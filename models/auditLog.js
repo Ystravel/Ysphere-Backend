@@ -8,7 +8,7 @@ const auditLogSchema = new Schema({
   },
   action: { // 執行的操作類型
     type: String,
-    enum: ['創建', '修改', '刪除', '登出'],
+    enum: ['創建', '修改', '刪除'],
     required: true
   },
   targetId: { // 操作目標的 ID
@@ -18,7 +18,7 @@ const auditLogSchema = new Schema({
   },
   targetModel: { // 操作目標的模型類型
     type: String,
-    enum: ['users', 'departments', 'companies', 'assets'],
+    enum: ['users', 'departments', 'assets'],
     required: true
   },
   changes: { // 具體修改內容

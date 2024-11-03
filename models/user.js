@@ -89,14 +89,9 @@ const schema = new Schema({
   emergencyRelationship: {
     type: String
   },
-  // company: {
-  //   type: ObjectId,
-  //   ref: 'companies',
-  //   // required: true,
-  //   // default: '永信旅行社'
-  // },
   printNumber: {
-    type: String
+    type: String,
+    unique: true
   },
   note: {
     type: String
