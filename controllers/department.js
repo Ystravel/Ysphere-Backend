@@ -115,6 +115,45 @@ export const getAll = async (req, res) => {
     })
   }
 }
+
+// 在 department.js controller 中添加新的控制器函數
+export const getById = async (req, res) => {
+  try {
+    const department = await Department.findById(req.params.id)
+
+    if (!department) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: '找不到指定的部門'
+      })
+    }
+
+    // 獲取部門當前在職人數
+    const memberCount = await User.countDocuments({
+      department: department._id,
+      employmentStatus: '在職'
+    })
+
+    // 返回部門信息，包括公司名稱和在職人數
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '獲取部門資料成功',
+      result: {
+        ...department.toObject(),
+        companyName: companyNames[department.companyId],
+        memberCount
+      }
+    })
+  } catch (error) {
+    console.error('Get department error:', error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '獲取部門資料時發生錯誤',
+      error: error.message || '未知錯誤'
+    })
+  }
+}
+
 // 總公司人數
 export const getCompanyTotalCount = async (req, res) => {
   try {

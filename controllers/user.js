@@ -6,6 +6,19 @@ import validator from 'validator'
 import Sequence from '../models/sequence.js'
 import AuditLog from '../models/auditLog.js'
 import Department from '../models/department.js'
+import { companyNames } from '../enums/Company.js'
+import UserRole from '../enums/UserRole.js'
+
+// 建立角色對照表
+const roleNames = {
+  [UserRole.USER]: '一般員工',
+  [UserRole.ADMIN]: '一般管理者',
+  [UserRole.SUPER_ADMIN]: '最高管理者',
+  [UserRole.HR]: '人資',
+  [UserRole.MANAGER]: '經理',
+  [UserRole.ACCOUNTANT]: '會計',
+  [UserRole.IT]: 'IT人員'
+}
 
 const getNextSequence = async (name) => {
   const sequence = await Sequence.findOneAndUpdate(
@@ -181,14 +194,13 @@ export const profile = (req, res) => {
 // 取得所有用戶資料（包含分頁與排序）
 export const getAll = async (req, res) => {
   try {
-    const sortBy = req.query.sortBy || 'userId'
-    const sortOrder = req.query.sortOrder || 'asc'
     const itemsPerPage = req.query.itemsPerPage * 1 || 10
-    const page = req.query.page * 1 || 1
+    const page = parseInt(req.query.page) || 1
     const regex = new RegExp(req.query.search || '', 'i')
     const roleFilter = req.query.role
 
-    const query = {
+    // 基本查詢條件
+    const baseMatch = {
       $or: [
         { name: regex },
         { email: regex },
@@ -198,37 +210,105 @@ export const getAll = async (req, res) => {
     }
 
     if (roleFilter !== undefined && roleFilter !== null && roleFilter !== '') {
-      query.role = Number(roleFilter)
+      baseMatch.role = Number(roleFilter)
     }
 
-    const totalItems = await User.countDocuments(query)
-    const data = await User
-      .find(query)
-      .populate({
-        path: 'department',
-        select: 'name companyId',
-        populate: { path: 'companyId', select: 'name' } // 透過公司ID查詢公司名稱
-      })
-      .sort({ [sortBy]: sortOrder })
-      .skip((page - 1) * itemsPerPage)
-      .limit(itemsPerPage)
+    // 處理排序邏輯
+    const sortBy = req.query.sortBy || 'userId'
+    const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1
 
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: '',
-      result: {
-        data,
-        totalItems,
-        itemsPerPage,
-        currentPage: page
+    // 根據不同的排序欄位設定不同的排序邏輯
+    switch (sortBy) {
+      case 'department.name':
+      case 'department.companyId': {
+        // 構建 pipeline
+        const pipeline = [
+          // 首先套用基本查詢條件
+          { $match: baseMatch },
+          // 關聯部門表
+          {
+            $lookup: {
+              from: 'departments',
+              localField: 'department',
+              foreignField: '_id',
+              as: 'departmentData'
+            }
+          },
+          // Unwind department array
+          {
+            $unwind: {
+              path: '$departmentData',
+              preserveNullAndEmptyArrays: true // 保留沒有部門的用戶
+            }
+          }
+        ]
+
+        // 根據排序欄位添加排序條件
+        const sortField = sortBy === 'department.name' ? 'departmentData.name' : 'departmentData.companyId'
+        pipeline.push({ $sort: { [sortField]: sortOrder } })
+
+        // 計算總數
+        const totalItems = await User.countDocuments(baseMatch)
+
+        // 添加分頁
+        pipeline.push(
+          { $skip: (page - 1) * itemsPerPage },
+          { $limit: itemsPerPage }
+        )
+
+        // 執行聚合查詢
+        const result = await User.aggregate(pipeline)
+
+        // 重新填充部門資訊
+        const data = await User.populate(result, {
+          path: 'department',
+          select: 'name companyId'
+        })
+
+        return res.status(StatusCodes.OK).json({
+          success: true,
+          message: '',
+          result: {
+            data,
+            totalItems,
+            itemsPerPage,
+            currentPage: page
+          }
+        })
       }
-    })
+
+      default: {
+        // 一般欄位的排序
+        const sortOption = { [sortBy]: sortOrder }
+        const totalItems = await User.countDocuments(baseMatch)
+
+        const data = await User
+          .find(baseMatch)
+          .populate({
+            path: 'department',
+            select: 'name companyId'
+          })
+          .sort(sortOption)
+          .skip((page - 1) * itemsPerPage)
+          .limit(itemsPerPage)
+
+        return res.status(StatusCodes.OK).json({
+          success: true,
+          message: '',
+          result: {
+            data,
+            totalItems,
+            itemsPerPage,
+            currentPage: page
+          }
+        })
+      }
+    }
   } catch (error) {
-    console.log(error)
+    console.error('Get users error:', error)
     handleError(res, error)
   }
 }
-
 // 用戶登出
 export const logout = async (req, res) => {
   try {
@@ -245,41 +325,116 @@ export const logout = async (req, res) => {
 }
 
 // 編輯用戶資料（僅限管理員）
+// 在 user controller 中修改 edit 函數
 export const edit = async (req, res) => {
   try {
     if (!validator.isMongoId(req.params.id)) throw new Error('ID')
 
-    const updateData = { ...req.body }
-    delete updateData.password
-
-    // 如果部門更改，重新取得對應的公司ID
-    if (req.body.department) {
-      const departmentData = await Department.findById(req.body.department)
-      if (!departmentData) {
-        return res.status(StatusCodes.BAD_REQUEST).json({ message: '找不到選定的部門' })
-      }
-      updateData.companyId = departmentData.companyId
+    // 先獲取原始用戶數據，並展開部門資訊
+    const originalUser = await User.findById(req.params.id).populate('department')
+    if (!originalUser) {
+      throw new Error('NOT FOUND')
     }
 
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true }
-    ).orFail(new Error('NOT FOUND'))
+    const updateData = { ...req.body }
+    delete updateData.password
+    delete updateData.company
 
-    await AuditLog.create({
-      operatorId: req.user._id,
-      action: '修改',
-      targetId: user._id,
-      targetModel: 'users',
-      changes: updateData
+    // 創建一個只包含已更改欄位的物件
+    const changedFields = {}
+    const auditChanges = {}
+
+    // 處理部門相關的變更
+    if (updateData.department && updateData.department !== originalUser.department._id.toString()) {
+      // 獲取新的部門資料
+      const newDepartment = await Department.findById(updateData.department)
+      if (!newDepartment) {
+        return res.status(StatusCodes.BAD_REQUEST).json({ message: '找不到選定的部門' })
+      }
+
+      // 比較部門名稱是否真的有變更
+      if (newDepartment.name !== originalUser.department.name) {
+        changedFields.department = updateData.department
+        auditChanges.department = {
+          from: originalUser.department.name,
+          to: newDepartment.name
+        }
+      }
+
+      // 檢查並記錄公司變更
+      const originalCompanyName = companyNames[originalUser.department.companyId]
+      const newCompanyName = companyNames[newDepartment.companyId]
+
+      if (newDepartment.companyId !== originalUser.department.companyId) {
+        changedFields.companyId = newDepartment.companyId
+        auditChanges.company = {
+          from: originalCompanyName,
+          to: newCompanyName
+        }
+      }
+    }
+
+    // 處理所有其他欄位的變更
+    Object.keys(updateData).forEach(key => {
+      // 跳過已處理的欄位
+      if (['department', 'companyId', 'company'].includes(key)) return
+
+      // 處理日期類型
+      if (key === 'birthDate' || key === 'hireDate' || key === 'resignationDate') {
+        const originalDate = originalUser[key] ? originalUser[key].toISOString() : null
+        const newDate = updateData[key] ? new Date(updateData[key]).toISOString() : null
+        if (originalDate !== newDate) {
+          changedFields[key] = updateData[key]
+          auditChanges[key] = {
+            from: originalDate,
+            to: newDate
+          }
+        } // 處理角色欄位
+      } else if (key === 'role' && originalUser[key]?.toString() !== updateData[key]?.toString()) {
+        changedFields[key] = updateData[key]
+        auditChanges[key] = {
+          from: roleNames[originalUser[key]] || `未知角色(${originalUser[key]})`,
+          to: roleNames[updateData[key]] || `未知角色(${updateData[key]})`
+        }
+      } else if (originalUser[key]?.toString() !== updateData[key]?.toString()) {
+        // 處理其他欄位
+        changedFields[key] = updateData[key]
+        auditChanges[key] = {
+          from: originalUser[key],
+          to: updateData[key]
+        }
+      }
     })
 
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: '用戶資料更新成功',
-      result: user
-    })
+    // 如果有欄位被更改才更新數據
+    if (Object.keys(changedFields).length > 0) {
+      const user = await User.findByIdAndUpdate(
+        req.params.id,
+        changedFields,
+        { new: true, runValidators: true }
+      ).populate('department')
+
+      // 記錄變更
+      await AuditLog.create({
+        operatorId: req.user._id,
+        action: '修改',
+        targetId: user._id,
+        targetModel: 'users',
+        changes: auditChanges
+      })
+
+      res.status(StatusCodes.OK).json({
+        success: true,
+        message: '用戶資料更新成功',
+        result: user
+      })
+    } else {
+      res.status(StatusCodes.OK).json({
+        success: true,
+        message: '沒有欄位被修改',
+        result: originalUser
+      })
+    }
   } catch (error) {
     console.error(error)
     handleError(res, error)
