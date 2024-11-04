@@ -208,111 +208,99 @@ export const getAll = async (req, res) => {
     const regex = new RegExp(req.query.search || '', 'i')
     const roleFilter = req.query.role
 
-    // 基本查詢條件
-    const baseMatch = {
-      $or: [
-        { name: regex },
-        { email: regex },
-        { userId: regex },
-        { cellphone: regex }
-      ]
-    }
-
-    if (roleFilter !== undefined && roleFilter !== null && roleFilter !== '') {
-      baseMatch.role = Number(roleFilter)
-    }
+    // 擴展基本查詢條件
+    const pipeline = [
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'department',
+          foreignField: '_id',
+          as: 'departmentData'
+        }
+      },
+      {
+        $unwind: {
+          path: '$departmentData',
+          preserveNullAndEmptyArrays: true
+        }
+      },
+      {
+        $match: {
+          $and: [
+            roleFilter !== undefined && roleFilter !== null && roleFilter !== ''
+              ? { role: Number(roleFilter) }
+              : {},
+            {
+              $or: [
+                { name: regex },
+                { englishName: regex },
+                { email: regex },
+                { userId: regex },
+                { cellphone: regex },
+                { employmentStatus: regex },
+                { 'departmentData.name': regex },
+                {
+                  'departmentData.companyId': {
+                    $in: Object.keys(companyNames)
+                      .filter(key => companyNames[key].match(regex))
+                      .map(Number)
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ]
 
     // 處理排序邏輯
     const sortBy = req.query.sortBy || 'userId'
     const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1
 
     // 根據不同的排序欄位設定不同的排序邏輯
-    switch (sortBy) {
-      case 'department.name':
-      case 'department.companyId': {
-        // 構建 pipeline
-        const pipeline = [
-          // 首先套用基本查詢條件
-          { $match: baseMatch },
-          // 關聯部門表
-          {
-            $lookup: {
-              from: 'departments',
-              localField: 'department',
-              foreignField: '_id',
-              as: 'departmentData'
-            }
-          },
-          // Unwind department array
-          {
-            $unwind: {
-              path: '$departmentData',
-              preserveNullAndEmptyArrays: true // 保留沒有部門的用戶
-            }
-          }
-        ]
-
-        // 根據排序欄位添加排序條件
-        const sortField = sortBy === 'department.name' ? 'departmentData.name' : 'departmentData.companyId'
-        pipeline.push({ $sort: { [sortField]: sortOrder } })
-
-        // 計算總數
-        const totalItems = await User.countDocuments(baseMatch)
-
-        // 添加分頁
-        pipeline.push(
-          { $skip: (page - 1) * itemsPerPage },
-          { $limit: itemsPerPage }
-        )
-
-        // 執行聚合查詢
-        const result = await User.aggregate(pipeline)
-
-        // 重新填充部門資訊
-        const data = await User.populate(result, {
-          path: 'department',
-          select: 'name companyId'
-        })
-
-        return res.status(StatusCodes.OK).json({
-          success: true,
-          message: '',
-          result: {
-            data,
-            totalItems,
-            itemsPerPage,
-            currentPage: page
-          }
-        })
-      }
-
-      default: {
-        // 一般欄位的排序
-        const sortOption = { [sortBy]: sortOrder }
-        const totalItems = await User.countDocuments(baseMatch)
-
-        const data = await User
-          .find(baseMatch)
-          .populate({
-            path: 'department',
-            select: 'name companyId'
-          })
-          .sort(sortOption)
-          .skip((page - 1) * itemsPerPage)
-          .limit(itemsPerPage)
-
-        return res.status(StatusCodes.OK).json({
-          success: true,
-          message: '',
-          result: {
-            data,
-            totalItems,
-            itemsPerPage,
-            currentPage: page
-          }
-        })
-      }
+    let sortStage
+    if (sortBy === 'department.name') {
+      sortStage = { $sort: { 'departmentData.name': sortOrder } }
+    } else if (sortBy === 'department.companyId') {
+      sortStage = { $sort: { 'departmentData.companyId': sortOrder } }
+    } else {
+      sortStage = { $sort: { [sortBy]: sortOrder } }
     }
+
+    pipeline.push(sortStage)
+
+    // 計算總數
+    const countPipeline = [...pipeline]
+    const [{ total } = { total: 0 }] = await User.aggregate([
+      ...countPipeline,
+      { $count: 'total' }
+    ])
+
+    // 添加分頁
+    pipeline.push(
+      { $skip: (page - 1) * itemsPerPage },
+      { $limit: itemsPerPage }
+    )
+
+    // 執行最終查詢
+    const result = await User.aggregate(pipeline)
+
+    // 重新填充部門資訊
+    const data = await User.populate(result, {
+      path: 'department',
+      select: 'name companyId'
+    })
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '',
+      result: {
+        data,
+        totalItems: total || 0,
+        itemsPerPage,
+        currentPage: page
+      }
+    })
   } catch (error) {
     console.error('Get users error:', error)
     handleError(res, error)
