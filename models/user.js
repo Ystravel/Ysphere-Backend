@@ -57,6 +57,10 @@ const schema = new Schema({
     ref: 'departments',
     required: true
   },
+  jobTitle: {
+    type: String,
+    required: [true, '請輸入職稱']
+  },
   role: {
     type: Number,
     default: UserRole.USER

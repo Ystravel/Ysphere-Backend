@@ -1,9 +1,7 @@
 import passport from 'passport'
 import passportLocal from 'passport-local'
 import passportJWT from 'passport-jwt'
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20'
 import bcrypt from 'bcrypt'
-import jwt from 'jsonwebtoken'
 import User from '../models/user.js'
 
 passport.use('login', new passportLocal.Strategy({

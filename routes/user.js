@@ -7,7 +7,9 @@ import {
   extend,
   logout,
   profile,
-  googleLogin
+  googleLogin,
+  updateUserProfile,
+  changePassword
 } from '../controllers/user.js'
 import * as auth from '../middlewares/auth.js'
 import checkRole from '../middlewares/checkRole.js'
@@ -24,11 +26,13 @@ router.post('/', auth.jwt, checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]), cr
 // 延長登入 token
 router.patch('/extend', auth.jwt, extend)
 
+router.patch('/change-password', auth.jwt, changePassword)
 // 取得所有用戶資料（僅限 ADMIN 和 SUPER_ADMIN）
 router.get('/all', auth.jwt, checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN]), getAll)
 
 // 取得當前用戶資料
 router.get('/profile', auth.jwt, profile)
+router.patch('/profile', auth.jwt, updateUserProfile)
 
 // 用戶登出
 router.delete('/logout', auth.jwt, logout)

@@ -8,6 +8,7 @@ import AuditLog from '../models/auditLog.js'
 import Department from '../models/department.js'
 import { companyNames } from '../enums/Company.js'
 import UserRole from '../enums/UserRole.js'
+import bcrypt from 'bcrypt'
 
 // 建立角色對照表
 const roleNames = {
@@ -83,7 +84,8 @@ export const login = async (req, res) => {
         email: req.user.email,
         name: req.user.name,
         role: req.user.role,
-        userId: req.user.userId
+        userId: req.user.userId,
+        jobTitle: req.user.jobTitle
       }
     })
   } catch (error) {
@@ -144,6 +146,7 @@ export const googleLogin = async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        jobTitle: user.jobTitle,
         userId: user.userId
       }
     })
@@ -181,9 +184,15 @@ export const profile = (req, res) => {
       success: true,
       message: '',
       result: {
-        email: req.user.email,
         name: req.user.name,
-        role: req.user.role
+        englishName: req.user.englishName,
+        cellphone: req.user.cellphone,
+        role: req.user.role,
+        department: req.user.department,
+        jobTitle: req.user.jobTitle,
+        userId: req.user.userId,
+        birthDate: req.user.birthDate,
+        address: req.user.address
       }
     })
   } catch (error) {
@@ -324,6 +333,55 @@ export const logout = async (req, res) => {
   }
 }
 
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body
+    const user = await User.findById(req.user._id)
+
+    // 驗證當前密碼
+    if (!bcrypt.compareSync(currentPassword, user.password)) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '當前密碼輸入錯誤'
+      })
+    }
+
+    // 驗證新密碼長度
+    if (newPassword.length < 8) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '新密碼長度至少需要8個字元'
+      })
+    }
+
+    // 更新密碼
+    user.password = newPassword // mongoose pre save hook 會自動進行 hash
+    await user.save()
+
+    // 記錄密碼變更
+    await AuditLog.create({
+      operatorId: user._id, // 因為是自己修改自己的密碼
+      action: '修改',
+      targetId: user._id,
+      targetModel: 'users',
+      changes: {
+        description: '密碼更改'
+      }
+    })
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '密碼更新成功'
+    })
+  } catch (error) {
+    console.error('Change password error:', error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '密碼更新失敗'
+    })
+  }
+}
+
 // 編輯用戶資料（僅限管理員）
 // 在 user controller 中修改 edit 函數
 export const edit = async (req, res) => {
@@ -438,6 +496,93 @@ export const edit = async (req, res) => {
   } catch (error) {
     console.error(error)
     handleError(res, error)
+  }
+}
+
+// 更新用戶個人資料
+export const updateUserProfile = async (req, res) => {
+  try {
+    const userId = req.user._id
+
+    // 獲取原始用戶數據
+    const originalUser = await User.findById(userId)
+
+    if (!originalUser) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: '查無用戶'
+      })
+    }
+
+    // 創建一個只包含已更改欄位的物件
+    const changedFields = {}
+    const auditChanges = {}
+
+    // 處理所有欄位的變更
+    const fieldsToUpdate = ['name', 'englishName', 'cellphone', 'birthDate', 'address']
+    fieldsToUpdate.forEach(key => {
+      if (key === 'birthDate') {
+        const originalDate = originalUser[key] ? originalUser[key].toISOString().slice(0, 10) : null
+        const newDate = req.body[key] ? new Date(req.body[key]).toISOString().slice(0, 10) : null
+        if (originalDate !== newDate) {
+          changedFields[key] = req.body[key]
+          auditChanges[key] = {
+            from: originalDate,
+            to: newDate
+          }
+        }
+      } else if (req.body[key] && originalUser[key]?.toString() !== req.body[key]?.toString()) {
+        changedFields[key] = req.body[key]
+        auditChanges[key] = {
+          from: originalUser[key],
+          to: req.body[key]
+        }
+      }
+    })
+
+    // 如果有欄位被更改才更新數據
+    if (Object.keys(changedFields).length > 0) {
+      const user = await User.findByIdAndUpdate(
+        userId,
+        changedFields,
+        { new: true, runValidators: true }
+      )
+
+      // 記錄變更
+      await AuditLog.create({
+        operatorId: req.user._id,
+        action: '修改',
+        targetId: user._id,
+        targetModel: 'users',
+        changes: auditChanges
+      })
+
+      res.status(StatusCodes.OK).json({
+        success: true,
+        result: user
+      })
+    } else {
+      res.status(StatusCodes.OK).json({
+        success: true,
+        message: '沒有欄位被修改',
+        result: originalUser
+      })
+    }
+  } catch (error) {
+    console.error('Update user profile error:', error)
+    if (error.name === 'ValidationError') {
+      const key = Object.keys(error.errors)[0]
+      const message = error.errors[key].message
+      res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message
+      })
+    } else {
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: '未知錯誤'
+      })
+    }
   }
 }
 
