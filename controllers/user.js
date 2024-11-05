@@ -178,21 +178,37 @@ export const extend = async (req, res) => {
 }
 
 // 取得當前用戶資料
-export const profile = (req, res) => {
+// 取得當前用戶資料
+export const profile = async (req, res) => {
   try {
+    // 使用 populate 來填充部門資訊
+    const user = await User.findById(req.user._id).populate('department')
+
     res.status(StatusCodes.OK).json({
       success: true,
       message: '',
       result: {
-        name: req.user.name,
-        englishName: req.user.englishName,
-        cellphone: req.user.cellphone,
-        role: req.user.role,
-        department: req.user.department,
-        jobTitle: req.user.jobTitle,
-        userId: req.user.userId,
-        birthDate: req.user.birthDate,
-        address: req.user.address
+        email: user.email,
+        IDNumber: user.IDNumber,
+        gender: user.gender,
+        name: user.name,
+        englishName: user.englishName,
+        cellphone: user.cellphone,
+        extension: user.extension,
+        birthDate: user.birthDate,
+        address: user.address,
+        department: user.department, // 現在這裡會包含完整的部門資訊
+        jobTitle: user.jobTitle,
+        role: user.role,
+        userId: user.userId,
+        hireDate: user.hireDate,
+        emergencyName: user.emergencyName,
+        emergencyCellphone: user.emergencyCellphone,
+        printNumber: user.printNumber
+        // cowellAccount: user.cowellAccount,
+        // cowellPassword: user.cowellPassword,
+        // nasAccount: user.nasAccount,
+        // nasPassword: user.nasPassword
       }
     })
   } catch (error) {

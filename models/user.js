@@ -65,6 +65,24 @@ const schema = new Schema({
     type: Number,
     default: UserRole.USER
   },
+  cowellAccount: {
+    type: String,
+    // required: [true, '請輸入科威帳號'],
+    unique: true
+  },
+  cowellPassword: {
+    type: String
+    // required: [true, '請輸入科威密碼']
+  },
+  nasAccount: {
+    type: String,
+    // required: [true, '請輸入 NAS 帳號'],
+    unique: true
+  },
+  nasPassword: {
+    type: String
+    // required: [true, '請輸入 NAS 密碼']
+  },
   userId: {
     type: String,
     unique: true
