@@ -194,9 +194,11 @@ export const profile = async (req, res) => {
         name: user.name,
         englishName: user.englishName,
         cellphone: user.cellphone,
+        salary: user.salary,
         extension: user.extension,
         birthDate: user.birthDate,
-        address: user.address,
+        permanentAddress: user.permanentAddress,
+        contactAddress: user.contactAddress,
         department: user.department, // 現在這裡會包含完整的部門資訊
         jobTitle: user.jobTitle,
         role: user.role,
@@ -322,6 +324,62 @@ export const getAll = async (req, res) => {
     handleError(res, error)
   }
 }
+
+// 在 user.controller.js 新增
+export const getEmployeeStats = async (req, res) => {
+  try {
+    // 獲取所有在職員工的公司分佈
+    const companyStats = await User.aggregate([
+      {
+        $match: {
+          employmentStatus: '在職'
+        }
+      },
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'department',
+          foreignField: '_id',
+          as: 'departmentData'
+        }
+      },
+      {
+        $unwind: '$departmentData'
+      },
+      {
+        $group: {
+          _id: '$departmentData.companyId',
+          count: { $sum: 1 }
+        }
+      }
+    ])
+
+    // 計算總在職人數
+    const totalActive = companyStats.reduce((sum, company) => sum + company.count, 0)
+
+    // 格式化響應數據
+    const stats = {
+      total: totalActive,
+      companies: companyStats.map(stat => ({
+        companyId: stat._id,
+        companyName: companyNames[stat._id],
+        count: stat.count
+      }))
+    }
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      result: stats
+    })
+  } catch (error) {
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '獲取員工統計資料失敗',
+      error: error.message
+    })
+  }
+}
+
 // 用戶登出
 export const logout = async (req, res) => {
   try {
@@ -500,93 +558,6 @@ export const edit = async (req, res) => {
   } catch (error) {
     console.error(error)
     handleError(res, error)
-  }
-}
-
-// 更新用戶個人資料
-export const updateUserProfile = async (req, res) => {
-  try {
-    const userId = req.user._id
-
-    // 獲取原始用戶數據
-    const originalUser = await User.findById(userId)
-
-    if (!originalUser) {
-      return res.status(StatusCodes.NOT_FOUND).json({
-        success: false,
-        message: '查無用戶'
-      })
-    }
-
-    // 創建一個只包含已更改欄位的物件
-    const changedFields = {}
-    const auditChanges = {}
-
-    // 處理所有欄位的變更
-    const fieldsToUpdate = ['name', 'englishName', 'cellphone', 'birthDate', 'address']
-    fieldsToUpdate.forEach(key => {
-      if (key === 'birthDate') {
-        const originalDate = originalUser[key] ? originalUser[key].toISOString().slice(0, 10) : null
-        const newDate = req.body[key] ? new Date(req.body[key]).toISOString().slice(0, 10) : null
-        if (originalDate !== newDate) {
-          changedFields[key] = req.body[key]
-          auditChanges[key] = {
-            from: originalDate,
-            to: newDate
-          }
-        }
-      } else if (req.body[key] && originalUser[key]?.toString() !== req.body[key]?.toString()) {
-        changedFields[key] = req.body[key]
-        auditChanges[key] = {
-          from: originalUser[key],
-          to: req.body[key]
-        }
-      }
-    })
-
-    // 如果有欄位被更改才更新數據
-    if (Object.keys(changedFields).length > 0) {
-      const user = await User.findByIdAndUpdate(
-        userId,
-        changedFields,
-        { new: true, runValidators: true }
-      )
-
-      // 記錄變更
-      await AuditLog.create({
-        operatorId: req.user._id,
-        action: '修改',
-        targetId: user._id,
-        targetModel: 'users',
-        changes: auditChanges
-      })
-
-      res.status(StatusCodes.OK).json({
-        success: true,
-        result: user
-      })
-    } else {
-      res.status(StatusCodes.OK).json({
-        success: true,
-        message: '沒有欄位被修改',
-        result: originalUser
-      })
-    }
-  } catch (error) {
-    console.error('Update user profile error:', error)
-    if (error.name === 'ValidationError') {
-      const key = Object.keys(error.errors)[0]
-      const message = error.errors[key].message
-      res.status(StatusCodes.BAD_REQUEST).json({
-        success: false,
-        message
-      })
-    } else {
-      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-        success: false,
-        message: '未知錯誤'
-      })
-    }
   }
 }
 

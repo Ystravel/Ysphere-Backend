@@ -40,6 +40,10 @@ const schema = new Schema({
     required: [true, '請輸入手機號碼'],
     unique: true
   },
+  salary: {
+    type: String,
+    required: [true, '請輸入基本薪資']
+  },
   extension: {
     type: String,
     required: [true, '請輸入分機號碼'],
@@ -49,8 +53,13 @@ const schema = new Schema({
     type: Date,
     required: [true, '請輸入生日']
   },
-  address: {
-    type: String
+  permanentAddress: {
+    type: String,
+    required: [true, '請輸入戶籍地址']
+  },
+  contactAddress: {
+    type: String,
+    required: [true, '請輸入通訊地址']
   },
   department: {
     type: ObjectId,
