@@ -28,7 +28,7 @@ router.patch('/extend', auth.jwt, extend)
 
 router.patch('/change-password', auth.jwt, changePassword)
 // 取得所有用戶資料（僅限 ADMIN 和 SUPER_ADMIN）
-router.get('/all', auth.jwt, checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN]), getAll)
+router.get('/all', auth.jwt, checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.ACCOUNTANT]), getAll)
 
 // 取得當前用戶資料
 router.get('/profile', auth.jwt, profile)
