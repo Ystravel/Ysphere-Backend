@@ -9,6 +9,16 @@ import Department from '../models/department.js'
 import { roleNames } from '../enums/UserRole.js'
 import { companyNames } from '../enums/Company.js'
 import bcrypt from 'bcrypt'
+import crypto from 'crypto'
+import nodemailer from 'nodemailer'
+
+const transporter = nodemailer.createTransport({
+  service: 'Gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+})
 
 const getNextSequence = async (name) => {
   const sequence = await Sequence.findOneAndUpdate(
@@ -548,6 +558,127 @@ export const edit = async (req, res) => {
   } catch (error) {
     console.error(error)
     handleError(res, error)
+  }
+}
+
+// 發送重置密碼郵件
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body
+    const user = await User.findOne({ email })
+
+    if (!user) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: '找不到此電子郵件對應的帳號'
+      })
+    }
+
+    // 檢查是否已經發送過重置郵件且未過期
+    if (user.resetPasswordExpires && user.resetPasswordExpires > new Date()) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '重置郵件已發送，請檢查您的信箱或稍後再試'
+      })
+    }
+
+    // 生成重置 token
+    const resetToken = crypto.randomBytes(32).toString('hex')
+
+    // 設置 token 和過期時間
+    user.resetPasswordToken = resetToken
+    user.resetPasswordExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 設為 24 小時後
+
+    await user.save()
+
+    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: 'YSTravel 密碼重置請求',
+      html: `
+        <h2>您好 ${user.name}，</h2>
+        <p>我們收到了您的密碼重置請求。請點擊下方連結重置您的密碼：</p>
+        <a href="${resetUrl}">${resetUrl}</a>
+        <p>此連結將在24小時後失效。</p>
+        <p>如果您沒有請求重置密碼，請忽略此郵件。</p>
+        <p>感謝您的使用！</p>
+        <p>YSTravel HR System</p>
+      `
+    }
+
+    await transporter.sendMail(mailOptions)
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '重置密碼郵件已發送，請檢查您的信箱'
+    })
+  } catch (error) {
+    console.error('忘記密碼錯誤:', error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '發送重置郵件時發生錯誤'
+    })
+  }
+}
+
+// 重置密碼
+// 在 controller 中修改 resetPassword 函數
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body
+
+    // 尋找有效的重置 token
+    const user = await User.findOne({
+      resetPasswordToken: token,
+      resetPasswordExpires: { $gt: new Date() }
+    })
+
+    if (!user) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '重置連結無效或已過期'
+      })
+    }
+
+    // 驗證新密碼長度
+    if (newPassword.length < 8) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '新密碼長度至少需要8個字元'
+      })
+    }
+
+    // 更新密碼
+    user.password = newPassword
+    // 清除重置token
+    user.resetPasswordToken = undefined
+    user.resetPasswordExpires = undefined
+
+    await user.save()
+
+    // 記錄密碼重置
+    await AuditLog.create({
+      operatorId: user._id,
+      action: '重置',
+      targetId: user._id,
+      targetModel: 'users',
+      changes: {
+        description: '透過郵件重置密碼'
+      }
+    })
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '密碼重置成功，請使用新密碼登入'
+    })
+  } catch (error) {
+    console.error('重置密碼錯誤:', error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '重置密碼時發生錯誤'
+    })
   }
 }
 

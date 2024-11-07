@@ -131,6 +131,15 @@ const schema = new Schema({
   note: {
     type: String
   },
+  resetPasswordToken: {
+    type: String,
+    default: undefined,
+    sparse: true
+  },
+  resetPasswordExpires: {
+    type: Date, // 改回 Date 類型
+    default: undefined
+  },
   tokens: {
     type: [String]
   }
@@ -138,6 +147,18 @@ const schema = new Schema({
   timestamps: true, // 使用者帳號建立時間、更新時間
   versionKey: false
 })
+
+schema.index(
+  {
+    resetPasswordToken: 1,
+    resetPasswordExpires: 1
+  },
+  {
+    sparse: true,
+    background: true,
+    expireAfterSeconds: 86400 // 24小時後自動刪除過期的重置token
+  }
+)
 
 schema.pre('save', function (next) {
   const user = this // this 指向 User model

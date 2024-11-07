@@ -9,7 +9,9 @@ import {
   profile,
   googleLogin,
   changePassword,
-  getEmployeeStats
+  getEmployeeStats,
+  forgotPassword,
+  resetPassword
 } from '../controllers/user.js'
 import * as auth from '../middlewares/auth.js'
 import checkRole from '../middlewares/checkRole.js'
@@ -42,5 +44,8 @@ router.post('/google-login', googleLogin)
 
 // 編輯用戶資料（僅限 ADMIN 和 SUPER_ADMIN）
 router.patch('/:id', auth.jwt, checkRole([UserRole.HR, UserRole.SUPER_ADMIN]), edit)
+
+router.post('/forgot-password', forgotPassword)
+router.post('/reset-password', resetPassword)
 
 export default router
