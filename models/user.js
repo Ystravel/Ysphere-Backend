@@ -133,11 +133,14 @@ const schema = new Schema({
   },
   resetPasswordToken: {
     type: String,
-    default: undefined,
-    sparse: true
+    default: undefined
   },
   resetPasswordExpires: {
-    type: Date, // 改回 Date 類型
+    type: Date,
+    default: undefined
+  },
+  lastEmailSent: { // 新增欄位跟蹤最後一次發送郵件的時間
+    type: Date,
     default: undefined
   },
   tokens: {

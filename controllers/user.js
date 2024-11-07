@@ -11,6 +11,8 @@ import { companyNames } from '../enums/Company.js'
 import bcrypt from 'bcrypt'
 import crypto from 'crypto'
 import nodemailer from 'nodemailer'
+import { fileURLToPath } from 'url'
+import path, { dirname } from 'path'
 
 const transporter = nodemailer.createTransport({
   service: 'Gmail',
@@ -561,6 +563,9 @@ export const edit = async (req, res) => {
   }
 }
 
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
+
 // 發送重置密碼郵件
 export const forgotPassword = async (req, res) => {
   try {
@@ -570,24 +575,33 @@ export const forgotPassword = async (req, res) => {
     if (!user) {
       return res.status(StatusCodes.NOT_FOUND).json({
         success: false,
-        message: '找不到此電子郵件對應的帳號'
+        message: '此電子郵件未註冊'
       })
     }
 
-    // 檢查是否已經發送過重置郵件且未過期
-    if (user.resetPasswordExpires && user.resetPasswordExpires > new Date()) {
-      return res.status(StatusCodes.BAD_REQUEST).json({
-        success: false,
-        message: '重置郵件已發送，請檢查您的信箱或稍後再試'
-      })
+    const currentDate = new Date()
+
+    // 檢查上次發送郵件的時間
+    if (user.lastEmailSent) {
+      const timeSinceLastEmail = currentDate - user.lastEmailSent
+      const fiveMinutes = 5 * 60 * 1000 // 5分鐘轉換為毫秒
+
+      if (timeSinceLastEmail < fiveMinutes) {
+        const waitTimeSeconds = Math.ceil((fiveMinutes - timeSinceLastEmail) / 1000)
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: `請等待 ${waitTimeSeconds} 秒後再試`
+        })
+      }
     }
 
     // 生成重置 token
     const resetToken = crypto.randomBytes(32).toString('hex')
 
-    // 設置 token 和過期時間
+    // 更新用戶資料
     user.resetPasswordToken = resetToken
-    user.resetPasswordExpires = new Date(Date.now() + 24 * 60 * 60 * 1000) // 設為 24 小時後
+    user.resetPasswordExpires = new Date(currentDate.getTime() + (24 * 60 * 60 * 1000)) // 24小時後過期
+    user.lastEmailSent = currentDate // 記錄發送時間
 
     await user.save()
 
@@ -596,16 +610,47 @@ export const forgotPassword = async (req, res) => {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: user.email,
-      subject: 'YSTravel 密碼重置請求',
+      subject: 'YSTravel - ERP系統 密碼重置請求',
       html: `
-        <h2>您好 ${user.name}，</h2>
-        <p>我們收到了您的密碼重置請求。請點擊下方連結重置您的密碼：</p>
-        <a href="${resetUrl}">${resetUrl}</a>
-        <p>此連結將在24小時後失效。</p>
-        <p>如果您沒有請求重置密碼，請忽略此郵件。</p>
-        <p>感謝您的使用！</p>
-        <p>YSTravel HR System</p>
-      `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <h2 style="color: #333;">密碼重置請求</h2>
+          </div>
+          
+          <div style="background: #f7f7f7; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
+            <h4 style="margin-top: 0;">${user.name} 您好，</h4>
+            <p>我們收到了您的密碼重置請求。請點擊下方連結重置您的密碼：</p>
+            <div style="text-align: center; margin: 20px 0;">
+              <a href="${resetUrl}" 
+                 style="background: #4CAF50; color: white; padding: 10px 20px; 
+                        text-decoration: none; border-radius: 5px; display: inline-block;">
+                重置密碼
+              </a>
+            </div>
+            <p style="color: #666; font-size: 14px;">
+              此連結將在24小時後失效。<br>
+            </p>
+            <p style="color: #666; font-size: 14px;">
+              如果您沒有請求重置密碼，請忽略此郵件。
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 30px;">
+            <p>感謝您的使用！</p>
+            <p style="color: #666; margin-bottom: 20px;">YSTravel ERP System</p>
+            <img src="cid:logo" alt="YSTravel Logo" style="max-width: 150px; height: auto;">
+          </div>
+
+          <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+            <p>此為系統自動發送的郵件，請勿直接回覆</p>
+          </div>
+        </div>
+      `,
+      attachments: [{
+        filename: 'logo.png',
+        path: path.join(__dirname, '../public/images/logo.png'), // 請確保這個路徑指向你的 logo 圖片
+        cid: 'logo' // 這個 ID 需要和 HTML 中的 cid 匹配
+      }]
     }
 
     await transporter.sendMail(mailOptions)
@@ -622,20 +667,18 @@ export const forgotPassword = async (req, res) => {
     })
   }
 }
-
 // 重置密碼
 // 在 controller 中修改 resetPassword 函數
 export const resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body
 
-    // 尋找有效的重置 token
+    // 使用 lean() 獲取純 JavaScript 物件
     const user = await User.findOne({
-      resetPasswordToken: token,
-      resetPasswordExpires: { $gt: new Date() }
-    })
+      resetPasswordToken: token
+    }).lean()
 
-    if (!user) {
+    if (!user || !user.resetPasswordExpires || user.resetPasswordExpires < new Date()) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
         message: '重置連結無效或已過期'
@@ -650,19 +693,23 @@ export const resetPassword = async (req, res) => {
       })
     }
 
-    // 更新密碼
-    user.password = newPassword
-    // 清除重置token
-    user.resetPasswordToken = undefined
-    user.resetPasswordExpires = undefined
-
-    await user.save()
+    // 更新使用者資料
+    const updatedUser = await User.findByIdAndUpdate(user._id, {
+      $set: {
+        password: bcrypt.hashSync(newPassword, 10)
+      },
+      $unset: {
+        resetPasswordToken: 1,
+        resetPasswordExpires: 1,
+        lastEmailSent: 1
+      }
+    }, { new: true })
 
     // 記錄密碼重置
     await AuditLog.create({
-      operatorId: user._id,
-      action: '重置',
-      targetId: user._id,
+      operatorId: updatedUser._id,
+      action: '修改',
+      targetId: updatedUser._id,
       targetModel: 'users',
       changes: {
         description: '透過郵件重置密碼'
