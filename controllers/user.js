@@ -6,20 +6,9 @@ import validator from 'validator'
 import Sequence from '../models/sequence.js'
 import AuditLog from '../models/auditLog.js'
 import Department from '../models/department.js'
+import { roleNames } from '../enums/UserRole.js'
 import { companyNames } from '../enums/Company.js'
-import UserRole from '../enums/UserRole.js'
 import bcrypt from 'bcrypt'
-
-// 建立角色對照表
-const roleNames = {
-  [UserRole.USER]: '一般員工',
-  [UserRole.ADMIN]: '一般管理者',
-  [UserRole.SUPER_ADMIN]: '最高管理者',
-  [UserRole.HR]: '人資',
-  [UserRole.MANAGER]: '經理',
-  [UserRole.ACCOUNTANT]: '會計',
-  [UserRole.IT]: 'IT人員'
-}
 
 const getNextSequence = async (name) => {
   const sequence = await Sequence.findOneAndUpdate(
@@ -206,7 +195,8 @@ export const profile = async (req, res) => {
         hireDate: user.hireDate,
         emergencyName: user.emergencyName,
         emergencyCellphone: user.emergencyCellphone,
-        printNumber: user.printNumber
+        printNumber: user.printNumber,
+        guideLicense: user.guideLicense
         // cowellAccount: user.cowellAccount,
         // cowellPassword: user.cowellPassword,
         // nasAccount: user.nasAccount,

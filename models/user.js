@@ -92,6 +92,10 @@ const schema = new Schema({
     type: String
     // required: [true, '請輸入 NAS 密碼']
   },
+  guideLicense: {
+    type: Boolean,
+    default: false
+  },
   userId: {
     type: String,
     unique: true

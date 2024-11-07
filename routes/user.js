@@ -41,6 +41,6 @@ router.delete('/logout', auth.jwt, logout)
 router.post('/google-login', googleLogin)
 
 // 編輯用戶資料（僅限 ADMIN 和 SUPER_ADMIN）
-router.patch('/:id', auth.jwt, checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN]), edit)
+router.patch('/:id', auth.jwt, checkRole([UserRole.HR, UserRole.SUPER_ADMIN]), edit)
 
 export default router
