@@ -45,7 +45,6 @@ export const create = async (req, res) => {
 }
 
 // 取得所有部門
-// 取得所有部門
 export const getAll = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1
@@ -54,8 +53,6 @@ export const getAll = async (req, res) => {
     const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1
     const search = req.query.search || ''
     const companyId = req.query.companyId // 新增 companyId 過濾參數
-
-    console.log('Received query:', req.query) // 加入調試日誌
 
     // 構建查詢條件
     const query = {}
@@ -66,8 +63,6 @@ export const getAll = async (req, res) => {
       query.companyId = companyId
     }
 
-    console.log('Filter query:', query) // 加入調試日誌
-
     // 計算總數
     const total = await Department.countDocuments(query)
 
@@ -76,8 +71,6 @@ export const getAll = async (req, res) => {
       .sort({ [sortBy]: sortOrder })
       .skip((page - 1) * itemsPerPage)
       .limit(itemsPerPage)
-
-    console.log('Found departments:', departments) // 加入調試日誌
 
     // 取得每個部門的人數
     const departmentsWithCounts = await Promise.all(
@@ -93,8 +86,6 @@ export const getAll = async (req, res) => {
         }
       })
     )
-
-    console.log('Final response:', departmentsWithCounts) // 加入調試日誌
 
     res.status(StatusCodes.OK).json({
       success: true,

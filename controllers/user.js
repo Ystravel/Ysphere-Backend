@@ -13,6 +13,7 @@ import crypto from 'crypto'
 import nodemailer from 'nodemailer'
 import { fileURLToPath } from 'url'
 import path, { dirname } from 'path'
+import { v2 as cloudinary } from 'cloudinary'
 
 const transporter = nodemailer.createTransport({
   service: 'Gmail',
@@ -82,11 +83,25 @@ export const login = async (req, res) => {
       message: '',
       result: {
         token,
-        email: req.user.email,
         name: req.user.name,
-        role: req.user.role,
+        englishName: req.user.englishName,
+        birthDate: req.user.birthDate,
+        gender: req.user.gender,
+        cellphone: req.user.cellphone,
+        email: req.user.email,
+        permanentAddress: req.user.permanentAddress,
+        contactAddress: req.user.contactAddress,
+        emergencyName: req.user.emergencyName,
+        emergencyCellphone: req.user.emergencyCellphone,
         userId: req.user.userId,
-        jobTitle: req.user.jobTitle
+        department: req.user.department,
+        hireDate: req.user.hireDate,
+        extNumber: req.user.extNumber,
+        printNumber: req.user.printNumber,
+        guideLicense: req.user.guideLicense,
+        role: req.user.role,
+        jobTitle: req.user.jobTitle,
+        avatar: req.user.avatar
       }
     })
   } catch (error) {
@@ -144,11 +159,25 @@ export const googleLogin = async (req, res) => {
       message: '登入成功',
       result: {
         token: jwtToken,
-        email: user.email,
         name: user.name,
+        englishName: user.englishName,
+        birthDate: user.birthDate,
+        gender: user.gender,
+        cellphone: user.cellphone,
+        email: user.email,
+        permanentAddress: user.permanentAddress,
+        contactAddress: user.contactAddress,
+        emergencyName: user.emergencyName,
+        emergencyCellphone: user.emergencyCellphone,
+        userId: user.userId,
+        department: user.department,
+        hireDate: user.hireDate,
+        extNumber: user.extNumber,
+        printNumber: user.printNumber,
+        guideLicense: user.guideLicense,
         role: user.role,
         jobTitle: user.jobTitle,
-        userId: user.userId
+        avatar: user.avatar
       }
     })
   } catch (error) {
@@ -179,7 +208,6 @@ export const extend = async (req, res) => {
 }
 
 // 取得當前用戶資料
-// 取得當前用戶資料
 export const profile = async (req, res) => {
   try {
     // 使用 populate 來填充部門資訊
@@ -196,7 +224,7 @@ export const profile = async (req, res) => {
         englishName: user.englishName,
         cellphone: user.cellphone,
         salary: user.salary,
-        extension: user.extension,
+        extNumber: user.extNumber,
         birthDate: user.birthDate,
         permanentAddress: user.permanentAddress,
         contactAddress: user.contactAddress,
@@ -208,7 +236,8 @@ export const profile = async (req, res) => {
         emergencyName: user.emergencyName,
         emergencyCellphone: user.emergencyCellphone,
         printNumber: user.printNumber,
-        guideLicense: user.guideLicense
+        guideLicense: user.guideLicense,
+        avatar: user.avatar
         // cowellAccount: user.cowellAccount,
         // cowellPassword: user.cowellPassword,
         // nasAccount: user.nasAccount,
@@ -327,7 +356,6 @@ export const getAll = async (req, res) => {
   }
 }
 
-// 在 user.controller.js 新增
 export const getEmployeeStats = async (req, res) => {
   try {
     // 獲取所有在職員工的公司分佈
@@ -622,7 +650,7 @@ export const forgotPassword = async (req, res) => {
             <p>我們收到了您的密碼重置請求。請點擊下方連結重置您的密碼：</p>
             <div style="text-align: center; margin: 20px 0;">
               <a href="${resetUrl}" 
-                 style="background: #4CAF50; color: white; padding: 10px 20px; 
+                  style="background: #4CAF50; color: white; padding: 10px 20px; 
                         text-decoration: none; border-radius: 5px; display: inline-block;">
                 重置密碼
               </a>
@@ -729,6 +757,52 @@ export const resetPassword = async (req, res) => {
   }
 }
 
+// 更新用戶頭像
+export const updateAvatar = async (req, res) => {
+  try {
+    if (!req.file || !req.file.path) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '未提供頭像文件'
+      })
+    }
+
+    const user = await User.findById(req.user._id)
+    if (!user) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: '找不到用戶'
+      })
+    }
+
+    // 如果用戶有舊頭像且不是默認頭像，則刪除
+    if (user.avatar && !user.avatar.includes('multiavatar')) {
+      // 從 Cloudinary URL 中提取 public_id
+      const publicId = user.avatar.split('/').pop().split('.')[0]
+      try {
+        await cloudinary.uploader.destroy(`avatars/${publicId}`)
+      } catch (error) {
+        console.error('刪除舊頭像失敗:', error)
+        // 即使刪除舊頭像失敗，我們仍然繼續更新新頭像
+      }
+    }
+
+    user.avatar = req.file.path // 更新用戶的頭像URL
+    await user.save()
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '頭像更新成功',
+      result: user.avatar
+    })
+  } catch (error) {
+    console.error('更新頭像錯誤:', error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '更新頭像失敗'
+    })
+  }
+}
 // 統一錯誤處理
 const handleError = (res, error) => {
   console.error('Error details:', error) // 增加錯誤詳細資訊的日誌
@@ -742,7 +816,7 @@ const handleError = (res, error) => {
   } else if (error.name === 'MongoServerError' && error.code === 11000) {
     res.status(StatusCodes.CONFLICT).json({
       success: false,
-      message: 'Email、身分證、手機、分機號碼或列印編號已註冊'
+      message: 'Email、身分證、手機、分機號碼、列印編號或員工編號已註冊'
     })
   } else if (error.message === 'ID') {
     res.status(StatusCodes.BAD_REQUEST).json({

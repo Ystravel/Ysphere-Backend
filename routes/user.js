@@ -11,11 +11,13 @@ import {
   changePassword,
   getEmployeeStats,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  updateAvatar
 } from '../controllers/user.js'
 import * as auth from '../middlewares/auth.js'
 import checkRole from '../middlewares/checkRole.js'
 import UserRole from '../enums/UserRole.js'
+import upload from '../middlewares/upload.js'
 
 const router = Router()
 
@@ -43,6 +45,8 @@ router.delete('/logout', auth.jwt, logout)
 router.post('/google-login', googleLogin)
 
 // 編輯用戶資料（僅限 ADMIN 和 SUPER_ADMIN）
+router.patch('/avatar', auth.jwt, upload, updateAvatar)
+
 router.patch('/:id', auth.jwt, checkRole([UserRole.HR, UserRole.SUPER_ADMIN]), edit)
 
 router.post('/forgot-password', forgotPassword)

@@ -44,7 +44,7 @@ const schema = new Schema({
     type: String,
     required: [true, '請輸入基本薪資']
   },
-  extension: {
+  extNumber: {
     type: String,
     required: [true, '請輸入分機號碼'],
     unique: true
@@ -74,24 +74,24 @@ const schema = new Schema({
     type: Number,
     default: UserRole.USER
   },
-  cowellAccount: {
-    type: String,
-    // required: [true, '請輸入科威帳號'],
-    unique: true
-  },
-  cowellPassword: {
-    type: String
-    // required: [true, '請輸入科威密碼']
-  },
-  nasAccount: {
-    type: String,
-    // required: [true, '請輸入 NAS 帳號'],
-    unique: true
-  },
-  nasPassword: {
-    type: String
-    // required: [true, '請輸入 NAS 密碼']
-  },
+  // cowellAccount: {
+  //   type: String,
+  //   // required: [true, '請輸入科威帳號'],
+  //   unique: true
+  // },
+  // cowellPassword: {
+  //   type: String
+  //   // required: [true, '請輸入科威密碼']
+  // },
+  // nasAccount: {
+  //   type: String,
+  //   // required: [true, '請輸入 NAS 帳號'],
+  //   unique: true
+  // },
+  // nasPassword: {
+  //   type: String
+  //   // required: [true, '請輸入 NAS 密碼']
+  // },
   guideLicense: {
     type: Boolean,
     default: false
@@ -142,6 +142,10 @@ const schema = new Schema({
   lastEmailSent: { // 新增欄位跟蹤最後一次發送郵件的時間
     type: Date,
     default: undefined
+  },
+  avatar: {
+    type: String,
+    default: 'https://api.multiavatar.com/0002.png'
   },
   tokens: {
     type: [String]
