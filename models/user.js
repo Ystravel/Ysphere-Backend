@@ -3,6 +3,45 @@ import validator from 'validator'
 import bcrypt from 'bcrypt'
 import UserRole from '../enums/UserRole.js'
 
+const todoSchema = new Schema({
+  userId: {
+    type: ObjectId,
+    ref: 'users',
+    required: true
+  },
+  title: {
+    type: String,
+    required: [true, '請輸入待辦事項標題']
+  },
+  description: {
+    type: String
+  },
+  dueDate: {
+    type: Date
+  },
+  priority: {
+    type: String,
+    enum: ['低', '中', '高'],
+    default: '中'
+  },
+  status: {
+    type: String,
+    enum: ['待處理', '進行中', '已完成'],
+    default: '待處理'
+  },
+  reminder: {
+    time: Date, // 提醒時間
+    isNotified: { // 是否已發送通知
+      type: Boolean,
+      default: false
+    }
+  },
+  created: {
+    type: Date,
+    default: Date.now
+  }
+})
+
 const schema = new Schema({
   email: {
     type: String,
@@ -146,6 +185,10 @@ const schema = new Schema({
   avatar: {
     type: String,
     default: 'https://api.multiavatar.com/0002.png'
+  },
+  todos: {
+    type: [todoSchema],
+    default: []
   },
   tokens: {
     type: [String]

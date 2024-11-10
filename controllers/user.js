@@ -137,7 +137,7 @@ export const googleLogin = async (req, res) => {
     const email = payload.email
 
     // 查找用戶
-    const user = await User.findOne({ email })
+    const user = await User.findOne({ email }).populate('department')
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -803,6 +803,7 @@ export const updateAvatar = async (req, res) => {
     })
   }
 }
+
 // 統一錯誤處理
 const handleError = (res, error) => {
   console.error('Error details:', error) // 增加錯誤詳細資訊的日誌
