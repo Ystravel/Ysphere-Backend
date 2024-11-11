@@ -16,9 +16,18 @@ export const create = async (req, res) => {
       targetId: department._id,
       targetModel: 'departments',
       changes: {
-        name,
-        companyId,
-        companyName: companyNames[companyId]
+        name: {
+          from: null,
+          to: name
+        },
+        companyId: {
+          from: null,
+          to: companyId
+        },
+        company: {
+          from: null,
+          to: companyNames[companyId]
+        }
       }
     })
 
@@ -181,11 +190,29 @@ export const getDepartmentCounts = async (req, res) => {
 export const edit = async (req, res) => {
   try {
     const { name, companyId } = req.body
+    // 先獲取原始部門數據
+    const originalDepartment = await Department.findById(req.params.id)
     const department = await Department.findByIdAndUpdate(
       req.params.id,
       { name, companyId },
       { new: true }
     )
+
+    // 記錄變更
+    const changes = {
+      name: {
+        from: originalDepartment.name,
+        to: name
+      },
+      companyId: {
+        from: originalDepartment.companyId,
+        to: companyId
+      },
+      company: {
+        from: companyNames[originalDepartment.companyId],
+        to: companyNames[companyId]
+      }
+    }
 
     // 取得部門人數
     const memberCount = await User.countDocuments({
@@ -198,11 +225,7 @@ export const edit = async (req, res) => {
       action: '修改',
       targetId: department._id,
       targetModel: 'departments',
-      changes: {
-        name,
-        companyId,
-        companyName: companyNames[companyId]
-      }
+      changes
     })
 
     res.status(StatusCodes.OK).json({

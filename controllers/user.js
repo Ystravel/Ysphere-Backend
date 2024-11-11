@@ -427,6 +427,38 @@ export const getAll = async (req, res) => {
   }
 }
 
+export const getSuggestions = async (req, res) => {
+  try {
+    const search = req.query.search || ''
+
+    // 構建搜索條件
+    const searchRegex = new RegExp(search, 'i')
+    const query = {
+      $or: [
+        { name: searchRegex },
+        { userId: searchRegex },
+        { email: searchRegex }
+      ]
+    }
+
+    // 限制返回數量並只返回必要欄位
+    const users = await User.find(query)
+      .select('name userId email')
+      .limit(10)
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      result: users
+    })
+  } catch (error) {
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '獲取用戶建議失敗',
+      error: error.message
+    })
+  }
+}
+
 export const getEmployeeStats = async (req, res) => {
   try {
     // 獲取所有在職員工的公司分佈

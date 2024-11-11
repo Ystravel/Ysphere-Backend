@@ -13,7 +13,8 @@ import {
   forgotPassword,
   resetPassword,
   updateAvatar,
-  remove
+  remove,
+  getSuggestions
 } from '../controllers/user.js'
 import * as auth from '../middlewares/auth.js'
 import checkRole from '../middlewares/checkRole.js'
@@ -38,6 +39,7 @@ router.get('/all', auth.jwt, checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SU
 // 取得當前用戶資料
 router.get('/profile', auth.jwt, profile)
 router.get('/employee-stats', auth.jwt, checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN]), getEmployeeStats)
+router.get('/suggestions', auth.jwt, checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]), getSuggestions)
 
 // 用戶登出
 router.delete('/logout', auth.jwt, logout)

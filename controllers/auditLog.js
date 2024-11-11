@@ -1,5 +1,6 @@
 import { StatusCodes } from 'http-status-codes'
 import AuditLog from '../models/auditLog.js'
+import mongoose from 'mongoose'
 
 // 取得所有異動紀錄（包含分頁與排序）
 export const getAll = async (req, res) => {
@@ -54,32 +55,47 @@ export const getAll = async (req, res) => {
     // 構建匹配條件
     const matchConditions = []
 
-    // 操作者搜尋
+    // 修改操作者搜尋邏輯
     if (operatorId) {
-      matchConditions.push({
-        $or: [
-          { 'operator.name': new RegExp(operatorId, 'i') },
-          { 'operator.userId': new RegExp(operatorId, 'i') }
-        ]
-      })
+      // 如果是 MongoDB ObjectId，直接用 ID 搜尋
+      if (mongoose.Types.ObjectId.isValid(operatorId)) {
+        matchConditions.push({
+          operatorId: new mongoose.Types.ObjectId(operatorId)
+        })
+      } else {
+        // 否則用文字搜尋
+        matchConditions.push({
+          $or: [
+            { 'operator.name': new RegExp(operatorId, 'i') },
+            { 'operator.userId': new RegExp(operatorId, 'i') }
+          ]
+        })
+      }
     }
 
-    // 被操作對象搜尋
+    // 修改被操作對象搜尋邏輯
     if (targetId) {
-      matchConditions.push({
-        $or: [
-          { 'target.name': new RegExp(targetId, 'i') },
-          { 'target.userId': new RegExp(targetId, 'i') }
-        ]
-      })
+      // 如果是 MongoDB ObjectId，直接用 ID 搜尋
+      if (mongoose.Types.ObjectId.isValid(targetId)) {
+        matchConditions.push({
+          targetId: new mongoose.Types.ObjectId(targetId)
+        })
+      } else {
+        // 否則用文字搜尋
+        matchConditions.push({
+          $or: [
+            { 'target.name': new RegExp(targetId, 'i') },
+            { 'target.userId': new RegExp(targetId, 'i') }
+          ]
+        })
+      }
     }
 
-    // 操作類型篩選
+    // 其他篩選條件
     if (action) {
       matchConditions.push({ action })
     }
 
-    // 資料類型篩選
     if (targetModel) {
       matchConditions.push({ targetModel })
     }
@@ -138,7 +154,8 @@ export const getAll = async (req, res) => {
         target: {
           _id: '$target._id',
           name: '$target.name',
-          userId: '$target.userId'
+          userId: '$target.userId',
+          department: '$departmentInfo'
         }
       }
     })
