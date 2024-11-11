@@ -52,15 +52,15 @@ export const getAll = async (req, res) => {
     const sortBy = req.query.sortBy || 'companyId'
     const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1
     const search = req.query.search || ''
-    const companyId = req.query.companyId // 新增 companyId 過濾參數
+    const companyId = req.query.companyId
 
     // 構建查詢條件
     const query = {}
     if (search) {
       query.name = new RegExp(search, 'i')
     }
-    if (companyId) { // 檢查 companyId 是否存在
-      query.companyId = companyId
+    if (companyId) {
+      query.companyId = parseInt(companyId)
     }
 
     // 計算總數
@@ -87,9 +87,10 @@ export const getAll = async (req, res) => {
       })
     )
 
+    // 完整的回應格式
     res.status(StatusCodes.OK).json({
       success: true,
-      message: '獲取部門列表成功',
+      message: '取得部門列表成功',
       result: {
         data: departmentsWithCounts,
         totalItems: total,
@@ -98,10 +99,10 @@ export const getAll = async (req, res) => {
       }
     })
   } catch (error) {
-    console.error('Get departments error:', error) // 詳細的錯誤日誌
+    console.error('取得部門列表錯誤:', error)
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
-      message: '獲取部門列表時發生錯誤',
+      message: '取得部門列表時發生錯誤',
       error: error.message || '未知錯誤'
     })
   }

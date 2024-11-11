@@ -8,6 +8,7 @@ import mongoSanitize from 'express-mongo-sanitize'
 // 導入路由
 import routeUser from './routes/user.js'
 import routeDepartment from './routes/department.js'
+import routeAuditLog from './routes/auditLog.js'
 // passport
 import './passport/passport.js'
 
@@ -42,6 +43,7 @@ app.use(mongoSanitize())
 
 app.use('/user', routeUser)
 app.use('/department', routeDepartment)
+app.use('/auditLog', routeAuditLog)
 
 app.all('*', (req, res) => {
   res.status(StatusCodes.NOT_FOUND).json({

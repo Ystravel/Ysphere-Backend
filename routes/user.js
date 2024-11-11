@@ -13,10 +13,7 @@ import {
   forgotPassword,
   resetPassword,
   updateAvatar,
-  getTodos,
-  addTodo,
-  updateTodo,
-  deleteTodo
+  remove
 } from '../controllers/user.js'
 import * as auth from '../middlewares/auth.js'
 import checkRole from '../middlewares/checkRole.js'
@@ -48,12 +45,6 @@ router.delete('/logout', auth.jwt, logout)
 // Google 登入
 router.post('/google-login', googleLogin)
 
-// 待辦事項相關路由
-router.get('/todos', auth.jwt, getTodos)
-router.post('/todos', auth.jwt, addTodo)
-router.patch('/todos/:todoId', auth.jwt, updateTodo)
-router.delete('/todos/:todoId', auth.jwt, deleteTodo)
-
 // 編輯用戶資料（僅限 ADMIN 和 SUPER_ADMIN）
 router.patch('/avatar', auth.jwt, upload, updateAvatar)
 
@@ -61,5 +52,7 @@ router.patch('/:id', auth.jwt, checkRole([UserRole.HR, UserRole.SUPER_ADMIN]), e
 
 router.post('/forgot-password', forgotPassword)
 router.post('/reset-password', resetPassword)
+
+router.delete('/:id', auth.jwt, checkRole([UserRole.HR, UserRole.SUPER_ADMIN]), remove)
 
 export default router

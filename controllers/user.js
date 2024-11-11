@@ -1,4 +1,5 @@
 import User from '../models/user.js'
+import mongoose from 'mongoose'
 import { StatusCodes } from 'http-status-codes'
 import { OAuth2Client } from 'google-auth-library'
 import jwt from 'jsonwebtoken'
@@ -254,11 +255,22 @@ export const getAll = async (req, res) => {
   try {
     const itemsPerPage = req.query.itemsPerPage * 1 || 10
     const page = parseInt(req.query.page) || 1
-    const regex = new RegExp(req.query.search || '', 'i')
-    const roleFilter = req.query.role
 
-    // 擴展基本查詢條件
+    // 獲取所有查詢參數
+    const {
+      search,
+      quickSearch,
+      role,
+      companyId,
+      department,
+      gender,
+      guideLicense,
+      employmentStatus
+    } = req.query
+
+    // 構建查詢管道
     const pipeline = [
+      // 關聯部門集合
       {
         $lookup: {
           from: 'departments',
@@ -272,35 +284,89 @@ export const getAll = async (req, res) => {
           path: '$departmentData',
           preserveNullAndEmptyArrays: true
         }
-      },
-      {
-        $match: {
-          $and: [
-            roleFilter !== undefined && roleFilter !== null && roleFilter !== ''
-              ? { role: Number(roleFilter) }
-              : {},
-            {
-              $or: [
-                { name: regex },
-                { englishName: regex },
-                { email: regex },
-                { userId: regex },
-                { cellphone: regex },
-                { employmentStatus: regex },
-                { 'departmentData.name': regex },
-                {
-                  'departmentData.companyId': {
-                    $in: Object.keys(companyNames)
-                      .filter(key => companyNames[key].match(regex))
-                      .map(Number)
-                  }
-                }
-              ]
-            }
-          ]
-        }
       }
     ]
+
+    // 構建匹配條件
+    const matchConditions = []
+
+    // 基本搜尋條件
+    if (search) {
+      matchConditions.push({
+        $or: [
+          { name: new RegExp(search, 'i') },
+          { englishName: new RegExp(search, 'i') },
+          { email: new RegExp(search, 'i') },
+          { userId: new RegExp(search, 'i') },
+          { cellphone: new RegExp(search, 'i') },
+          { extNumber: new RegExp(search, 'i') },
+          { printNumber: new RegExp(search, 'i') },
+          { jobTitle: new RegExp(search, 'i') },
+          { note: new RegExp(search, 'i') },
+          { 'departmentData.name': new RegExp(search, 'i') },
+          {
+            'departmentData.companyId': {
+              $in: Object.keys(companyNames)
+                .filter(key => companyNames[key].match(new RegExp(search, 'i')))
+                .map(Number)
+            }
+          }
+        ]
+      })
+    }
+
+    // 快速搜尋條件
+    if (quickSearch) {
+      matchConditions.push({
+        $or: [
+          { name: new RegExp(quickSearch, 'i') },
+          { userId: new RegExp(quickSearch, 'i') },
+          { cellphone: new RegExp(quickSearch, 'i') },
+          { extNumber: new RegExp(quickSearch, 'i') },
+          { email: new RegExp(quickSearch, 'i') },
+          { printNumber: new RegExp(quickSearch, 'i') },
+          { note: new RegExp(quickSearch, 'i') },
+          { jobTitle: new RegExp(quickSearch, 'i') }
+        ]
+      })
+    }
+
+    // 其他篩選條件
+    if (role !== undefined && role !== '') {
+      matchConditions.push({ role: Number(role) })
+    }
+
+    if (companyId !== undefined && companyId !== '') {
+      matchConditions.push({ 'departmentData.companyId': Number(companyId) })
+    }
+
+    if (department !== undefined && department !== '') {
+      matchConditions.push({ department: new mongoose.Types.ObjectId(department) })
+    }
+
+    if (gender !== undefined && gender !== '') {
+      matchConditions.push({ gender })
+    }
+
+    if (guideLicense !== undefined && guideLicense !== '') {
+      matchConditions.push({ guideLicense: guideLicense === 'true' })
+    }
+
+    if (employmentStatus !== undefined && employmentStatus !== '') {
+      matchConditions.push({ employmentStatus })
+    }
+
+    // 確保至少有一個條件
+    if (matchConditions.length === 0) {
+      matchConditions.push({}) // 添加空對象作為默認條件
+    }
+
+    // 添加 $match 階段
+    pipeline.push({
+      $match: {
+        $and: matchConditions
+      }
+    })
 
     // 處理排序邏輯
     const sortBy = req.query.sortBy || 'userId'
@@ -340,6 +406,7 @@ export const getAll = async (req, res) => {
       select: 'name companyId'
     })
 
+    // 格式化響應
     res.status(StatusCodes.OK).json({
       success: true,
       message: '',
@@ -352,7 +419,11 @@ export const getAll = async (req, res) => {
     })
   } catch (error) {
     console.error('Get users error:', error)
-    handleError(res, error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '獲取用戶列表時發生錯誤',
+      error: error.message
+    })
   }
 }
 
@@ -421,6 +492,46 @@ export const logout = async (req, res) => {
       message: '登出成功'
     })
   } catch (error) {
+    handleError(res, error)
+  }
+}
+
+export const remove = async (req, res) => {
+  try {
+    if (!validator.isMongoId(req.params.id)) throw new Error('ID')
+
+    const user = await User.findById(req.params.id).populate('department')
+    if (!user) {
+      throw new Error('NOT FOUND')
+    }
+
+    // 記錄要刪除的用戶資料，用於記錄日誌
+    const deletedUserInfo = {
+      name: user.name,
+      userId: user.userId,
+      email: user.email,
+      department: user.department?.name,
+      companyName: companyNames[user.department?.companyId]
+    }
+
+    // 刪除用戶
+    await user.deleteOne()
+
+    // 記錄刪除操作
+    await AuditLog.create({
+      operatorId: req.user._id,
+      action: '刪除',
+      targetId: user._id,
+      targetModel: 'users',
+      changes: deletedUserInfo
+    })
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '用戶刪除成功'
+    })
+  } catch (error) {
+    console.error('Delete user error:', error)
     handleError(res, error)
   }
 }
