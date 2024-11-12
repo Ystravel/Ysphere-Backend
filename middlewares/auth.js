@@ -25,15 +25,23 @@ export const login = (req, res, next) => {
         return
       }
     }
+
+    // 檢查員工任職狀態
+    if (user.employmentStatus !== '在職') {
+      res.status(StatusCodes.FORBIDDEN).json({
+        success: false,
+        message: '此帳號已停用，如有疑問請聯絡人資部門'
+      })
+      return
+    }
+
     req.user = user
     next()
   })(req, res, next)
 }
 
 export const jwt = (req, res, next) => {
-  // console.log('JWT middleware called')
   passport.authenticate('jwt', { session: false }, (error, data, info) => {
-    // console.log('JWT authentication result:', { error, data, info })
     if (error || !data) {
       if (info instanceof jsonwebtoken.JsonWebTokenError) {
         res.status(StatusCodes.UNAUTHORIZED).json({
@@ -53,9 +61,18 @@ export const jwt = (req, res, next) => {
       }
       return
     }
+
+    // 檢查員工任職狀態
+    if (data.user.employmentStatus !== '在職') {
+      res.status(StatusCodes.FORBIDDEN).json({
+        success: false,
+        message: '此帳號已停用，如有疑問請聯絡人資部門'
+      })
+      return
+    }
+
     req.user = data.user
     req.token = data.token
-    // console.log('JWT authentication successful')
     next()
   })(req, res, next)
 }

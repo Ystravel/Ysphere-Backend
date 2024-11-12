@@ -76,6 +76,14 @@ export const create = async (req, res) => {
 // 用戶登入
 export const login = async (req, res) => {
   try {
+    // 檢查使用者狀態
+    if (req.user.employmentStatus !== '在職') {
+      return res.status(StatusCodes.FORBIDDEN).json({
+        success: false,
+        message: '此帳號已停用，如有疑問請聯絡人資部門'
+      })
+    }
+
     const token = jwt.sign({ _id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7 days' })
     req.user.tokens.push(token)
     await req.user.save()
@@ -123,12 +131,8 @@ const oauth2Client = new OAuth2Client(
 export const googleLogin = async (req, res) => {
   try {
     const { code } = req.body
-
-    // 使用授權碼獲取 tokens
     const { tokens } = await oauth2Client.getToken(code)
     const idToken = tokens.id_token
-
-    // 驗證 ID Token
     const ticket = await oauth2Client.verifyIdToken({
       idToken,
       audience: process.env.GOOGLE_CLIENT_ID
@@ -146,12 +150,18 @@ export const googleLogin = async (req, res) => {
       })
     }
 
-    // 生成 JWT
+    // 檢查用戶狀態
+    if (user.employmentStatus !== '在職') {
+      return res.status(StatusCodes.FORBIDDEN).json({
+        success: false,
+        message: '此帳號已停用，如有疑問請聯絡人資部門'
+      })
+    }
+
     const jwtToken = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
       expiresIn: '7 days'
     })
 
-    // 保存 token
     user.tokens.push(jwtToken)
     await user.save()
 
@@ -194,6 +204,14 @@ export const googleLogin = async (req, res) => {
 // 延長用戶登入 token
 export const extend = async (req, res) => {
   try {
+    // 添加檢查用戶狀態
+    if (req.user.employmentStatus !== '在職') {
+      return res.status(StatusCodes.FORBIDDEN).json({
+        success: false,
+        message: '此帳號已停用，如有疑問請聯絡人資部門'
+      })
+    }
+
     const idx = req.user.tokens.findIndex(token => token === req.token)
     const token = jwt.sign({ _id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7 days' })
     req.user.tokens[idx] = token
@@ -573,6 +591,14 @@ export const changePassword = async (req, res) => {
     const { currentPassword, newPassword } = req.body
     const user = await User.findById(req.user._id)
 
+    // 添加檢查用戶狀態
+    if (user.employmentStatus !== '在職') {
+      return res.status(StatusCodes.FORBIDDEN).json({
+        success: false,
+        message: '此帳號已停用，如有疑問請聯絡人資部門'
+      })
+    }
+
     // 驗證當前密碼
     if (!bcrypt.compareSync(currentPassword, user.password)) {
       return res.status(StatusCodes.BAD_REQUEST).json({
@@ -750,6 +776,14 @@ export const forgotPassword = async (req, res) => {
       })
     }
 
+    // 檢查用戶狀態
+    if (user.employmentStatus !== '在職') {
+      return res.status(StatusCodes.FORBIDDEN).json({
+        success: false,
+        message: '此帳號已停用，如有疑問請聯絡人資部門'
+      })
+    }
+
     const currentDate = new Date()
 
     // 檢查上次發送郵件的時間
@@ -853,6 +887,14 @@ export const resetPassword = async (req, res) => {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
         message: '重置連結無效或已過期'
+      })
+    }
+
+    // 檢查用戶狀態
+    if (user.employmentStatus !== '在職') {
+      return res.status(StatusCodes.FORBIDDEN).json({
+        success: false,
+        message: '此帳號已停用，如有疑問請聯絡人資部門'
       })
     }
 

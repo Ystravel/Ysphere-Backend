@@ -13,9 +13,16 @@ passport.use('login', new passportLocal.Strategy({
     if (!user) {
       throw new Error('EMAIL_NOT_FOUND')
     }
+
+    // 檢查員工任職狀態
+    if (user.employmentStatus !== '在職') {
+      throw new Error('ACCOUNT_DISABLED')
+    }
+
     if (!bcrypt.compareSync(password, user.password)) {
       throw new Error('PASSWORD_INCORRECT')
     }
+
     return done(null, user, null)
   } catch (error) {
     console.log(error)
@@ -23,6 +30,8 @@ passport.use('login', new passportLocal.Strategy({
       return done(null, null, { message: '此電子郵件尚未申請' })
     } else if (error.message === 'PASSWORD_INCORRECT') {
       return done(null, null, { message: '密碼錯誤' })
+    } else if (error.message === 'ACCOUNT_DISABLED') {
+      return done(null, null, { message: '此帳號已停用，如有疑問請聯絡人資部門' })
     } else {
       return done(null, null, { message: '未知錯誤' })
     }
@@ -45,8 +54,14 @@ passport.use('jwt', new passportJWT.Strategy({
 
     const token = passportJWT.ExtractJwt.fromAuthHeaderAsBearerToken()(req)
     const user = await User.findOne({ _id: payload._id, tokens: token })
+
     if (!user) {
       throw new Error('JWT')
+    }
+
+    // 檢查員工任職狀態
+    if (user.employmentStatus !== '在職') {
+      throw new Error('ACCOUNT_DISABLED')
     }
 
     return done(null, { user, token }, null)
@@ -55,6 +70,8 @@ passport.use('jwt', new passportJWT.Strategy({
       return done(null, null, { message: '登入過期' })
     } else if (error.message === 'JWT') {
       return done(null, null, { message: '登入無效' })
+    } else if (error.message === 'ACCOUNT_DISABLED') {
+      return done(null, null, { message: '此帳號已停用，如有疑問請聯絡人資部門' })
     } else {
       return done(null, null, { message: '未知錯誤' })
     }
