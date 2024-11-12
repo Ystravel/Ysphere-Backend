@@ -3,12 +3,45 @@ import User from '../models/user.js'
 import AuditLog from '../models/auditLog.js'
 import { StatusCodes } from 'http-status-codes'
 import { companyNames } from '../enums/Company.js'
+import Sequence from '../models/sequence.js'
 
 // 創建部門
 export const create = async (req, res) => {
   try {
     const { name, companyId } = req.body
-    const department = await Department.create({ name, companyId })
+
+    // 獲取該公司的最後一個部門編號
+    const sequence = await Sequence.findOne({
+      name: `department_${companyId}`
+    })
+
+    let sequenceValue
+    if (!sequence) {
+      // 如果是該公司的第一個部門，創建新的序列
+      const newSequence = await Sequence.create({
+        name: `department_${companyId}`,
+        value: 1
+      })
+      sequenceValue = newSequence.value
+    } else {
+      // 如果已有序列，增加值
+      const updatedSequence = await Sequence.findOneAndUpdate(
+        { name: `department_${companyId}` },
+        { $inc: { value: 1 } },
+        { new: true }
+      )
+      sequenceValue = updatedSequence.value
+    }
+
+    // 生成部門ID: 公司ID + 兩位數序號
+    const departmentId = `${companyId}${String(sequenceValue).padStart(2, '0')}`
+
+    // 創建部門
+    const department = await Department.create({
+      name,
+      companyId,
+      departmentId
+    })
 
     await AuditLog.create({
       operatorId: req.user._id,
@@ -27,6 +60,10 @@ export const create = async (req, res) => {
         company: {
           from: null,
           to: companyNames[companyId]
+        },
+        departmentId: {
+          from: null,
+          to: departmentId
         }
       }
     })
@@ -40,7 +77,7 @@ export const create = async (req, res) => {
       }
     })
   } catch (error) {
-    console.error('Error creating department:', error) // 加入詳細錯誤日誌
+    console.error('Error creating department:', error)
     let errorMessage = '創建部門時發生錯誤'
     if (error.code === 11000) {
       errorMessage = '該公司已有相同名稱的部門，請更改部門名稱'
@@ -62,12 +99,25 @@ export const getAll = async (req, res) => {
     const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1
     const search = req.query.search || ''
     const companyId = req.query.companyId
+    const searchFields = req.query.searchFields || ['name'] // 添加搜尋欄位參數
 
     // 構建查詢條件
     const query = {}
+
+    // 搜尋條件
     if (search) {
-      query.name = new RegExp(search, 'i')
+      if (Array.isArray(searchFields)) {
+        // 如果有指定多個搜尋欄位，建立 $or 查詢
+        query.$or = searchFields.map(field => ({
+          [field]: new RegExp(search, 'i')
+        }))
+      } else {
+        // 預設搜尋名稱
+        query.name = new RegExp(search, 'i')
+      }
     }
+
+    // 公司篩選
     if (companyId) {
       query.companyId = parseInt(companyId)
     }

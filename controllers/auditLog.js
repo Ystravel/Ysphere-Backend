@@ -35,19 +35,82 @@ export const getAll = async (req, res) => {
           preserveNullAndEmptyArrays: true
         }
       },
-      // 關聯被操作對象
+      // 根據 targetModel 做不同的關聯查詢
       {
-        $lookup: {
-          from: 'users',
-          localField: 'targetId',
-          foreignField: '_id',
-          as: 'target'
+        $facet: {
+          userTarget: [
+            {
+              $match: {
+                targetModel: 'users'
+              }
+            },
+            {
+              $lookup: {
+                from: 'users',
+                localField: 'targetId',
+                foreignField: '_id',
+                as: 'target'
+              }
+            }
+          ],
+          departmentTarget: [
+            {
+              $match: {
+                targetModel: 'departments'
+              }
+            },
+            {
+              $lookup: {
+                from: 'departments',
+                localField: 'targetId',
+                foreignField: '_id',
+                as: 'target'
+              }
+            }
+          ],
+          assetTarget: [
+            {
+              $match: {
+                targetModel: 'assets'
+              }
+            },
+            {
+              $lookup: {
+                from: 'assets',
+                localField: 'targetId',
+                foreignField: '_id',
+                as: 'target'
+              }
+            }
+          ]
         }
       },
       {
-        $unwind: {
-          path: '$target',
-          preserveNullAndEmptyArrays: true
+        $project: {
+          allTargets: {
+            $concatArrays: [
+              '$userTarget',
+              '$departmentTarget',
+              '$assetTarget'
+            ]
+          }
+        }
+      },
+      {
+        $unwind: '$allTargets'
+      },
+      {
+        $replaceRoot: {
+          newRoot: {
+            $mergeObjects: [
+              '$allTargets',
+              {
+                target: {
+                  $arrayElemAt: ['$allTargets.target', 0]
+                }
+              }
+            ]
+          }
         }
       }
     ]
@@ -57,13 +120,11 @@ export const getAll = async (req, res) => {
 
     // 修改操作者搜尋邏輯
     if (operatorId) {
-      // 如果是 MongoDB ObjectId，直接用 ID 搜尋
       if (mongoose.Types.ObjectId.isValid(operatorId)) {
         matchConditions.push({
           operatorId: new mongoose.Types.ObjectId(operatorId)
         })
       } else {
-        // 否則用文字搜尋
         matchConditions.push({
           $or: [
             { 'operator.name': new RegExp(operatorId, 'i') },
@@ -75,19 +136,34 @@ export const getAll = async (req, res) => {
 
     // 修改被操作對象搜尋邏輯
     if (targetId) {
-      // 如果是 MongoDB ObjectId，直接用 ID 搜尋
       if (mongoose.Types.ObjectId.isValid(targetId)) {
         matchConditions.push({
           targetId: new mongoose.Types.ObjectId(targetId)
         })
       } else {
-        // 否則用文字搜尋
-        matchConditions.push({
-          $or: [
+        const searchConditions = []
+
+        // 根據不同的目標模型添加搜尋條件
+        if (!targetModel || targetModel === 'users') {
+          searchConditions.push(
             { 'target.name': new RegExp(targetId, 'i') },
             { 'target.userId': new RegExp(targetId, 'i') }
-          ]
-        })
+          )
+        }
+        if (!targetModel || targetModel === 'departments') {
+          searchConditions.push(
+            { 'target.name': new RegExp(targetId, 'i') },
+            { 'target.departmentId': new RegExp(targetId, 'i') }
+          )
+        }
+        if (!targetModel || targetModel === 'assets') {
+          searchConditions.push(
+            { 'target.name': new RegExp(targetId, 'i') },
+            { 'target.assetId': new RegExp(targetId, 'i') }
+          )
+        }
+
+        matchConditions.push({ $or: searchConditions })
       }
     }
 
@@ -104,10 +180,16 @@ export const getAll = async (req, res) => {
     if (startDate || endDate) {
       const dateCondition = {}
       if (startDate) {
-        dateCondition.$gte = new Date(startDate)
+        // 將開始日期設為台灣時間當天的 00:00:00
+        const startDateTime = new Date(startDate)
+        startDateTime.setHours(0, 0, 0, 0)
+        dateCondition.$gte = startDateTime
       }
       if (endDate) {
-        dateCondition.$lte = new Date(endDate + 'T23:59:59.999Z')
+        // 將結束日期設為台灣時間當天的 23:59:59.999
+        const endDateTime = new Date(endDate)
+        endDateTime.setHours(23, 59, 59, 999)
+        dateCondition.$lte = endDateTime
       }
       matchConditions.push({ createdAt: dateCondition })
     }
@@ -146,16 +228,14 @@ export const getAll = async (req, res) => {
         action: 1,
         targetModel: 1,
         changes: 1,
-        operator: {
-          _id: '$operator._id',
-          name: '$operator.name',
-          userId: '$operator.userId'
-        },
+        operator: 1,
         target: {
           _id: '$target._id',
           name: '$target.name',
           userId: '$target.userId',
-          department: '$departmentInfo'
+          departmentId: '$target.departmentId',
+          assetId: '$target.assetId',
+          companyId: '$target.companyId'
         }
       }
     })

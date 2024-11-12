@@ -5,8 +5,12 @@ const departmentSchema = new Schema({
     type: String,
     required: [true, '請輸入部門名稱']
   },
+  departmentId: {
+    type: String,
+    unique: true
+  },
   companyId: {
-    type: Number, // 改為 Number 類型
+    type: Number,
     required: [true, '請選擇所屬公司'],
     enum: [1, 2, 3, 4, 5, 6, 7, 8] // 限制可用的公司 ID
   }
