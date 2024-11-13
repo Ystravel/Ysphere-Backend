@@ -157,7 +157,7 @@ export const login = async (req, res) => {
       })
     }
 
-    const token = jwt.sign({ _id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7 days' })
+    const token = jwt.sign({ _id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '10h' })
     req.user.tokens.push(token)
     await req.user.save()
     res.status(StatusCodes.OK).json({
@@ -232,7 +232,7 @@ export const googleLogin = async (req, res) => {
     }
 
     const jwtToken = jwt.sign({ _id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: '7 days'
+      expiresIn: '10h'
     })
 
     user.tokens.push(jwtToken)
@@ -275,29 +275,29 @@ export const googleLogin = async (req, res) => {
 }
 
 // 延長用戶登入 token
-export const extend = async (req, res) => {
-  try {
-    // 添加檢查用戶狀態
-    if (req.user.employmentStatus !== '在職') {
-      return res.status(StatusCodes.FORBIDDEN).json({
-        success: false,
-        message: '此帳號已停用，如有疑問請聯絡人資部門'
-      })
-    }
+// export const extend = async (req, res) => {
+//   try {
+//     // 添加檢查用戶狀態
+//     if (req.user.employmentStatus !== '在職') {
+//       return res.status(StatusCodes.FORBIDDEN).json({
+//         success: false,
+//         message: '此帳號已停用，如有疑問請聯絡人資部門'
+//       })
+//     }
 
-    const idx = req.user.tokens.findIndex(token => token === req.token)
-    const token = jwt.sign({ _id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '7 days' })
-    req.user.tokens[idx] = token
-    await req.user.save()
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: '',
-      result: token
-    })
-  } catch (error) {
-    handleError(res, error)
-  }
-}
+//     const idx = req.user.tokens.findIndex(token => token === req.token)
+//     const token = jwt.sign({ _id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '1m' })
+//     req.user.tokens[idx] = token
+//     await req.user.save()
+//     res.status(StatusCodes.OK).json({
+//       success: true,
+//       message: '',
+//       result: token
+//     })
+//   } catch (error) {
+//     handleError(res, error)
+//   }
+// }
 
 // 取得當前用戶資料
 export const profile = async (req, res) => {

@@ -4,7 +4,7 @@ import {
   getAll,
   edit,
   login,
-  extend,
+  // extend,
   logout,
   profile,
   googleLogin,
@@ -30,7 +30,7 @@ router.post('/login', auth.login, login)
 router.post('/', auth.jwt, checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]), create)
 
 // 延長登入 token
-router.patch('/extend', auth.jwt, extend)
+// router.patch('/extend', auth.jwt, extend)
 
 router.patch('/change-password', auth.jwt, changePassword)
 // 取得所有用戶資料（僅限 ADMIN 和 SUPER_ADMIN）
