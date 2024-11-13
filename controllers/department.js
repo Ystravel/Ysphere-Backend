@@ -45,13 +45,26 @@ export const create = async (req, res) => {
 
     await AuditLog.create({
       operatorId: req.user._id,
+      operatorInfo: {
+        name: req.user.name,
+        userId: req.user.userId
+      },
       action: '創建',
       targetId: department._id,
+      targetInfo: {
+        name: department.name,
+        departmentId: department.departmentId,
+        companyId: department.companyId
+      },
       targetModel: 'departments',
       changes: {
         name: {
           from: null,
           to: name
+        },
+        departmentId: {
+          from: null,
+          to: departmentId
         },
         companyId: {
           from: null,
@@ -60,10 +73,6 @@ export const create = async (req, res) => {
         company: {
           from: null,
           to: companyNames[companyId]
-        },
-        departmentId: {
-          from: null,
-          to: departmentId
         }
       }
     })
@@ -71,10 +80,7 @@ export const create = async (req, res) => {
     res.status(StatusCodes.OK).json({
       success: true,
       message: '部門創建成功',
-      result: {
-        ...department.toObject(),
-        companyName: companyNames[department.companyId]
-      }
+      result: department
     })
   } catch (error) {
     console.error('Error creating department:', error)
@@ -237,7 +243,6 @@ export const getDepartmentCounts = async (req, res) => {
 }
 
 // 編輯部門
-// 編輯部門
 export const edit = async (req, res) => {
   try {
     const { name, companyId, departmentId } = req.body
@@ -287,6 +292,10 @@ export const edit = async (req, res) => {
         from: originalDepartment.name,
         to: name
       },
+      departmentId: {
+        from: originalDepartment.departmentId,
+        to: departmentId
+      },
       companyId: {
         from: originalDepartment.companyId,
         to: companyId
@@ -294,13 +303,8 @@ export const edit = async (req, res) => {
       company: {
         from: companyNames[originalDepartment.companyId],
         to: companyNames[companyId]
-      },
-      departmentId: {
-        from: originalDepartment.departmentId,
-        to: departmentId
       }
     }
-
     // 取得部門人數
     const memberCount = await User.countDocuments({
       department: updatedDepartment._id,
@@ -309,8 +313,17 @@ export const edit = async (req, res) => {
 
     await AuditLog.create({
       operatorId: req.user._id,
+      operatorInfo: {
+        name: req.user.name,
+        userId: req.user.userId
+      },
       action: '修改',
       targetId: updatedDepartment._id,
+      targetInfo: {
+        name: updatedDepartment.name,
+        departmentId: updatedDepartment.departmentId,
+        companyId: updatedDepartment.companyId
+      },
       targetModel: 'departments',
       changes
     })
@@ -382,13 +395,35 @@ export const remove = async (req, res) => {
 
     await AuditLog.create({
       operatorId: req.user._id,
+      operatorInfo: {
+        name: req.user.name,
+        userId: req.user.userId
+      },
       action: '刪除',
       targetId: department._id,
+      targetInfo: {
+        name: department.name,
+        departmentId: department.departmentId,
+        companyId: department.companyId
+      },
       targetModel: 'departments',
       changes: {
-        name: department.name,
-        companyId: department.companyId,
-        companyName: companyNames[department.companyId]
+        name: {
+          from: department.name,
+          to: null
+        },
+        departmentId: {
+          from: department.departmentId,
+          to: null
+        },
+        companyId: {
+          from: department.companyId,
+          to: null
+        },
+        company: {
+          from: companyNames[department.companyId],
+          to: null
+        }
       }
     })
 

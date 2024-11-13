@@ -54,12 +54,85 @@ export const create = async (req, res) => {
       companyId: departmentData.companyId // 新增用戶的 companyId
     })
 
+    const changes = {
+      name: {
+        from: null,
+        to: result.name
+      },
+      userId: {
+        from: null,
+        to: result.userId
+      },
+      email: {
+        from: null,
+        to: result.email
+      },
+      gender: {
+        from: null,
+        to: result.gender
+      },
+      IDNumber: {
+        from: null,
+        to: result.IDNumber
+      },
+      department: {
+        from: null,
+        to: departmentData.name
+      },
+      company: {
+        from: null,
+        to: companyNames[departmentData.companyId]
+      },
+      role: {
+        from: null,
+        to: roleNames[result.role]
+      },
+      employmentStatus: {
+        from: null,
+        to: result.employmentStatus
+      }
+    }
+
+    // 加入可選欄位
+    if (result.jobTitle) {
+      changes.jobTitle = {
+        from: null,
+        to: result.jobTitle
+      }
+    }
+    if (result.cellphone) {
+      changes.cellphone = {
+        from: null,
+        to: result.cellphone
+      }
+    }
+    if (result.extNumber) {
+      changes.extNumber = {
+        from: null,
+        to: result.extNumber
+      }
+    }
+    if (result.birthDate) {
+      changes.birthDate = {
+        from: null,
+        to: result.birthDate
+      }
+    }
+
     await AuditLog.create({
-      operatorId: req.user ? req.user._id : null,
+      operatorId: req.user._id,
+      operatorInfo: {
+        name: req.user.name,
+        userId: req.user.userId
+      },
       action: '創建',
       targetId: result._id,
+      targetInfo: {
+        name: result.name,
+        userId: result.userId
+      },
       targetModel: 'users',
-      changes: { ...req.body, userId }
+      changes
     })
 
     res.status(StatusCodes.OK).json({
@@ -555,25 +628,45 @@ export const remove = async (req, res) => {
       throw new Error('NOT FOUND')
     }
 
-    // 記錄要刪除的用戶資料，用於記錄日誌
-    const deletedUserInfo = {
-      name: user.name,
-      userId: user.userId,
-      email: user.email,
-      department: user.department?.name,
-      companyName: companyNames[user.department?.companyId]
-    }
-
     // 刪除用戶
     await user.deleteOne()
 
     // 記錄刪除操作
     await AuditLog.create({
       operatorId: req.user._id,
+      operatorInfo: {
+        name: req.user.name,
+        userId: req.user.userId
+      },
       action: '刪除',
       targetId: user._id,
+      targetInfo: {
+        name: user.name,
+        userId: user.userId
+      },
       targetModel: 'users',
-      changes: deletedUserInfo
+      changes: {
+        name: {
+          from: user.name,
+          to: null
+        },
+        userId: {
+          from: user.userId,
+          to: null
+        },
+        email: {
+          from: user.email,
+          to: null
+        },
+        department: {
+          from: user.department.name,
+          to: null
+        },
+        employmentStatus: {
+          from: user.employmentStatus,
+          to: null
+        }
+      }
     })
 
     res.status(StatusCodes.OK).json({
@@ -621,12 +714,23 @@ export const changePassword = async (req, res) => {
 
     // 記錄密碼變更
     await AuditLog.create({
-      operatorId: user._id, // 因為是自己修改自己的密碼
+      operatorId: user._id,
+      operatorInfo: { // 加入這個
+        name: user.name,
+        userId: user.userId
+      },
       action: '修改',
       targetId: user._id,
+      targetInfo: { // 加入這個
+        name: user.name,
+        userId: user.userId
+      },
       targetModel: 'users',
       changes: {
-        description: '密碼更改'
+        description: { // 修改格式
+          from: '原密碼',
+          to: '新密碼'
+        }
       }
     })
 
@@ -736,8 +840,16 @@ export const edit = async (req, res) => {
       // 記錄變更
       await AuditLog.create({
         operatorId: req.user._id,
+        operatorInfo: { // 加入這個
+          name: req.user.name,
+          userId: req.user.userId
+        },
         action: '修改',
         targetId: user._id,
+        targetInfo: { // 加入這個
+          name: user.name,
+          userId: user.userId
+        },
         targetModel: 'users',
         changes: auditChanges
       })
@@ -921,11 +1033,22 @@ export const resetPassword = async (req, res) => {
     // 記錄密碼重置
     await AuditLog.create({
       operatorId: updatedUser._id,
+      operatorInfo: { // 加入這個
+        name: updatedUser.name,
+        userId: updatedUser.userId
+      },
       action: '修改',
       targetId: updatedUser._id,
+      targetInfo: { // 加入這個
+        name: updatedUser.name,
+        userId: updatedUser.userId
+      },
       targetModel: 'users',
       changes: {
-        description: '透過郵件重置密碼'
+        description: { // 修改格式
+          from: '舊密碼',
+          to: '透過郵件重置的新密碼'
+        }
       }
     })
 

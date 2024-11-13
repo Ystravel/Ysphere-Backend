@@ -8,7 +8,6 @@ export const getAll = async (req, res) => {
     const itemsPerPage = req.query.itemsPerPage * 1 || 10
     const page = parseInt(req.query.page) || 1
 
-    // 獲取所有查詢參數
     const {
       operatorId,
       targetId,
@@ -18,7 +17,6 @@ export const getAll = async (req, res) => {
       endDate
     } = req.query
 
-    // 構建查詢管道
     const pipeline = [
       // 關聯操作者
       {
@@ -30,56 +28,32 @@ export const getAll = async (req, res) => {
         }
       },
       {
-        $unwind: {
-          path: '$operator',
-          preserveNullAndEmptyArrays: true
+        $addFields: {
+          operator: { $arrayElemAt: ['$operator', 0] }
         }
       },
-      // 根據 targetModel 做不同的關聯查詢
+      // 處理操作對象查詢 - 分開處理不同模型
       {
         $facet: {
-          userTarget: [
-            {
-              $match: {
-                targetModel: 'users'
-              }
-            },
+          users: [
+            { $match: { targetModel: 'users' } },
             {
               $lookup: {
                 from: 'users',
                 localField: 'targetId',
                 foreignField: '_id',
-                as: 'target'
+                as: 'targetData'
               }
             }
           ],
-          departmentTarget: [
-            {
-              $match: {
-                targetModel: 'departments'
-              }
-            },
+          departments: [
+            { $match: { targetModel: 'departments' } },
             {
               $lookup: {
                 from: 'departments',
                 localField: 'targetId',
                 foreignField: '_id',
-                as: 'target'
-              }
-            }
-          ],
-          assetTarget: [
-            {
-              $match: {
-                targetModel: 'assets'
-              }
-            },
-            {
-              $lookup: {
-                from: 'assets',
-                localField: 'targetId',
-                foreignField: '_id',
-                as: 'target'
+                as: 'targetData'
               }
             }
           ]
@@ -87,54 +61,42 @@ export const getAll = async (req, res) => {
       },
       {
         $project: {
-          allTargets: {
-            $concatArrays: [
-              '$userTarget',
-              '$departmentTarget',
-              '$assetTarget'
-            ]
+          all: {
+            $concatArrays: ['$users', '$departments']
           }
         }
       },
-      {
-        $unwind: '$allTargets'
-      },
-      {
-        $replaceRoot: {
-          newRoot: {
-            $mergeObjects: [
-              '$allTargets',
-              {
-                target: {
-                  $arrayElemAt: ['$allTargets.target', 0]
-                }
-              }
-            ]
-          }
-        }
-      }
+      { $unwind: '$all' },
+      { $replaceRoot: { newRoot: '$all' } }
     ]
 
     // 構建匹配條件
     const matchConditions = []
 
-    // 修改操作者搜尋邏輯
+    // 優先使用 ID 查詢操作者
     if (operatorId) {
       if (mongoose.Types.ObjectId.isValid(operatorId)) {
         matchConditions.push({
           operatorId: new mongoose.Types.ObjectId(operatorId)
         })
       } else {
+        // 如果不是有效的 ObjectId,則根據 userId 查詢
         matchConditions.push({
           $or: [
-            { 'operator.name': new RegExp(operatorId, 'i') },
-            { 'operator.userId': new RegExp(operatorId, 'i') }
+            { 'operator.userId': operatorId },
+            // 如果關聯查詢為空,才使用 operatorInfo
+            {
+              $and: [
+                { operator: null },
+                { 'operatorInfo.userId': operatorId }
+              ]
+            }
           ]
         })
       }
     }
 
-    // 修改被操作對象搜尋邏輯
+    // 優先使用 ID 查詢目標對象
     if (targetId) {
       if (mongoose.Types.ObjectId.isValid(targetId)) {
         matchConditions.push({
@@ -143,23 +105,28 @@ export const getAll = async (req, res) => {
       } else {
         const searchConditions = []
 
-        // 根據不同的目標模型添加搜尋條件
         if (!targetModel || targetModel === 'users') {
           searchConditions.push(
-            { 'target.name': new RegExp(targetId, 'i') },
-            { 'target.userId': new RegExp(targetId, 'i') }
+            { 'targetData.userId': targetId },
+            // 如果關聯查詢為空,才使用 targetInfo
+            {
+              $and: [
+                { targetData: null },
+                { 'targetInfo.userId': targetId }
+              ]
+            }
           )
         }
         if (!targetModel || targetModel === 'departments') {
           searchConditions.push(
-            { 'target.name': new RegExp(targetId, 'i') },
-            { 'target.departmentId': new RegExp(targetId, 'i') }
-          )
-        }
-        if (!targetModel || targetModel === 'assets') {
-          searchConditions.push(
-            { 'target.name': new RegExp(targetId, 'i') },
-            { 'target.assetId': new RegExp(targetId, 'i') }
+            { 'targetData.departmentId': targetId },
+            // 如果關聯查詢為空,才使用 targetInfo
+            {
+              $and: [
+                { targetData: null },
+                { 'targetInfo.departmentId': targetId }
+              ]
+            }
           )
         }
 
@@ -167,7 +134,6 @@ export const getAll = async (req, res) => {
       }
     }
 
-    // 其他篩選條件
     if (action) {
       matchConditions.push({ action })
     }
@@ -180,30 +146,21 @@ export const getAll = async (req, res) => {
     if (startDate || endDate) {
       const dateCondition = {}
       if (startDate) {
-        // 將開始日期設為台灣時間當天的 00:00:00
-        const startDateTime = new Date(startDate)
-        startDateTime.setHours(0, 0, 0, 0)
-        dateCondition.$gte = startDateTime
+        dateCondition.$gte = new Date(startDate)
       }
       if (endDate) {
-        // 將結束日期設為台灣時間當天的 23:59:59.999
-        const endDateTime = new Date(endDate)
-        endDateTime.setHours(23, 59, 59, 999)
-        dateCondition.$lte = endDateTime
+        dateCondition.$lte = new Date(endDate)
       }
       matchConditions.push({ createdAt: dateCondition })
     }
 
-    // 加入匹配條件
     if (matchConditions.length > 0) {
       pipeline.push({
-        $match: {
-          $and: matchConditions
-        }
+        $match: { $and: matchConditions }
       })
     }
 
-    // 處理排序
+    // 排序處理
     const sortBy = req.query.sortBy || 'createdAt'
     const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1
     pipeline.push({ $sort: { [sortBy]: sortOrder } })
@@ -215,32 +172,38 @@ export const getAll = async (req, res) => {
       { $count: 'total' }
     ])
 
-    // 添加分頁
+    // 分頁處理
     pipeline.push(
       { $skip: (page - 1) * itemsPerPage },
       { $limit: itemsPerPage }
     )
 
-    // 調整最終輸出格式
+    // 最終投影 - 優先使用關聯數據
     pipeline.push({
       $project: {
         createdAt: 1,
         action: 1,
         targetModel: 1,
         changes: 1,
-        operator: 1,
-        target: {
-          _id: '$target._id',
-          name: '$target.name',
-          userId: '$target.userId',
-          departmentId: '$target.departmentId',
-          assetId: '$target.assetId',
-          companyId: '$target.companyId'
+        operatorInfo: 1,
+        targetInfo: 1,
+        operator: {
+          $cond: {
+            if: { $ne: ['$operator', null] },
+            then: '$operator',
+            else: '$operatorInfo'
+          }
+        },
+        targetData: {
+          $cond: {
+            if: { $ne: [{ $arrayElemAt: ['$targetData', 0] }, null] },
+            then: { $arrayElemAt: ['$targetData', 0] },
+            else: '$targetInfo'
+          }
         }
       }
     })
 
-    // 執行查詢
     const data = await AuditLog.aggregate(pipeline)
 
     res.status(StatusCodes.OK).json({

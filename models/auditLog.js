@@ -22,6 +22,16 @@ const auditLogSchema = new Schema({
     enum: ['users', 'departments', 'assets'],
     required: true
   },
+  operatorInfo: {
+    name: String,
+    userId: String
+  },
+  targetInfo: {
+    name: String,
+    userId: String,
+    departmentId: String,
+    companyId: Number
+  },
   changes: {
     type: Object, // 改為 Object 類型而不是 Map
     default: {}
