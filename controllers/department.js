@@ -237,14 +237,47 @@ export const getDepartmentCounts = async (req, res) => {
 }
 
 // 編輯部門
+// 編輯部門
 export const edit = async (req, res) => {
   try {
-    const { name, companyId } = req.body
+    const { name, companyId, departmentId } = req.body
+
     // 先獲取原始部門數據
     const originalDepartment = await Department.findById(req.params.id)
-    const department = await Department.findByIdAndUpdate(
+
+    if (!originalDepartment) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: '找不到指定的部門'
+      })
+    }
+
+    // 檢查 departmentId 是否重複
+    if (departmentId !== originalDepartment.departmentId) {
+      const existingDepartment = await Department.findOne({ departmentId })
+      if (existingDepartment) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: '部門編號已存在'
+        })
+      }
+    }
+
+    // 檢查該公司是否有重複的部門名稱
+    if (name !== originalDepartment.name || companyId !== originalDepartment.companyId) {
+      const existingDepartment = await Department.findOne({ name, companyId })
+      if (existingDepartment) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: '該公司已有相同名稱的部門'
+        })
+      }
+    }
+
+    // 更新部門數據
+    const updatedDepartment = await Department.findByIdAndUpdate(
       req.params.id,
-      { name, companyId },
+      { name, companyId, departmentId },
       { new: true }
     )
 
@@ -261,19 +294,23 @@ export const edit = async (req, res) => {
       company: {
         from: companyNames[originalDepartment.companyId],
         to: companyNames[companyId]
+      },
+      departmentId: {
+        from: originalDepartment.departmentId,
+        to: departmentId
       }
     }
 
     // 取得部門人數
     const memberCount = await User.countDocuments({
-      department: department._id,
+      department: updatedDepartment._id,
       employmentStatus: '在職'
     })
 
     await AuditLog.create({
       operatorId: req.user._id,
       action: '修改',
-      targetId: department._id,
+      targetId: updatedDepartment._id,
       targetModel: 'departments',
       changes
     })
@@ -282,12 +319,31 @@ export const edit = async (req, res) => {
       success: true,
       message: '部門更新成功',
       result: {
-        ...department.toObject(),
-        companyName: companyNames[department.companyId],
+        ...updatedDepartment.toObject(),
+        companyName: companyNames[updatedDepartment.companyId],
         memberCount
       }
     })
   } catch (error) {
+    console.error('更新部門錯誤:', error)
+
+    if (error.code === 11000) {
+      // 重複的 departmentId
+      if (error.keyPattern && error.keyPattern.departmentId) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: '部門編號已存在'
+        })
+      }
+      // 重複的部門名稱和公司組合
+      if (error.keyPattern && error.keyPattern.name && error.keyPattern.companyId) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: '該公司已有相同名稱的部門'
+        })
+      }
+    }
+
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: '更新部門時發生錯誤',
