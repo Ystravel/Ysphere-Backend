@@ -184,7 +184,7 @@ const schema = new Schema({
   },
   avatar: {
     type: String,
-    default: 'https://res.cloudinary.com/dcwkukgf3/image/upload/v1731592900/avatar_robot_ph7rqg.webp'
+    default: 'https://res.cloudinary.com/dcwkukgf3/image/upload/v1731628234/avatar_robot_small_hzzbom.jpg'
   },
   todos: {
     type: [todoSchema],
