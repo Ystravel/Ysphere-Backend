@@ -4,8 +4,8 @@ import { StatusCodes } from 'http-status-codes'
 import { OAuth2Client } from 'google-auth-library'
 import jwt from 'jsonwebtoken'
 import validator from 'validator'
-import Sequence from '../models/sequence.js'
 import AuditLog from '../models/auditLog.js'
+import { getNextUserNumber } from '../utils/sequence.js'
 import Department from '../models/department.js'
 import { roleNames } from '../enums/UserRole.js'
 import { companyNames } from '../enums/Company.js'
@@ -24,19 +24,10 @@ const transporter = nodemailer.createTransport({
   }
 })
 
-const getNextSequence = async (name) => {
-  const sequence = await Sequence.findOneAndUpdate(
-    { name },
-    { $inc: { value: 1 } },
-    { new: true, upsert: true }
-  )
-  return sequence.value
-}
-
 export const create = async (req, res) => {
   try {
-    const sequenceValue = await getNextSequence('user')
-    const userId = `${String(sequenceValue).padStart(4, '0')}`
+    // 使用新的方法獲取用戶編號
+    const userId = await getNextUserNumber()
 
     // 從請求中提取 department ID
     const { department } = req.body
@@ -51,9 +42,10 @@ export const create = async (req, res) => {
       ...req.body,
       userId,
       department,
-      companyId: departmentData.companyId // 新增用戶的 companyId
+      companyId: departmentData.companyId
     })
 
+    // 記錄審計日誌部分保持不變
     const changes = {
       name: {
         from: null,
@@ -917,7 +909,7 @@ export const forgotPassword = async (req, res) => {
 
     // 更新用戶資料
     user.resetPasswordToken = resetToken
-    user.resetPasswordExpires = new Date(currentDate.getTime() + (24 * 60 * 60 * 1000)) // 24小時後過期
+    user.resetPasswordExpires = new Date(currentDate.getTime() + (30 * 60 * 1000)) // 30分鐘後過期
     user.lastEmailSent = currentDate // 記錄發送時間
 
     await user.save()
@@ -927,34 +919,34 @@ export const forgotPassword = async (req, res) => {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: user.email,
-      subject: 'YSTravel - ERP系統 密碼重置請求',
+      subject: 'Ysphere - 永信星球 密碼重置請求',
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="font-family: Arial, sans-serif; max-width: 400px; margin: 0 auto; padding: 20px;">
           <div style="text-align: center; margin-bottom: 20px;">
             <h2 style="color: #333;">密碼重置請求</h2>
           </div>
           
-          <div style="background: #f7f7f7; padding: 20px; border-radius: 5px; margin-bottom: 20px;">
-            <h4 style="margin-top: 0;">${user.name} 您好，</h4>
-            <p>我們收到了您的密碼重置請求。請點擊下方連結重置您的密碼：</p>
-            <div style="text-align: center; margin: 20px 0;">
+          <div style="background: #f7f7f7; padding: 28px; border-radius: 5px; margin-bottom: 20px;">
+            <p style="margin-top: 0; font-size: 14px; font-weight: 600">${user.name} 您好，</p>
+            <p style="font-size: 14px; font-weight: 500">我們收到了您的密碼重置請求。請點擊下方連結重置您的密碼：</p>
+            <div style="text-align: center; margin: 40px 0;">
               <a href="${resetUrl}" 
-                  style="background: #4CAF50; color: white; padding: 10px 20px; 
-                        text-decoration: none; border-radius: 5px; display: inline-block;">
+                  style="background: #495866; color: white; padding: 12px 24px; 
+                        text-decoration: none; letter-spacing:2px; font-size:14px; border-radius: 5px; display: inline-block;">
                 重置密碼
               </a>
             </div>
-            <p style="color: #666; font-size: 14px;">
-              此連結將在24小時後失效。<br>
+            <p style="color: #666; font-size: 13px;">
+              此連結將在30分鐘後失效。<br>
             </p>
-            <p style="color: #666; font-size: 14px;">
+            <p style="color: #666; font-size: 13px;">
               如果您沒有請求重置密碼，請忽略此郵件。
             </p>
           </div>
           
           <div style="text-align: center; margin-top: 30px;">
             <p>感謝您的使用！</p>
-            <p style="color: #666; margin-bottom: 20px;">YSTravel ERP System</p>
+            <p style="color: #666; margin-bottom: 20px;">Ysphere ERP System</p>
             <img src="cid:logo" alt="YSTravel Logo" style="max-width: 150px; height: auto;">
           </div>
 
@@ -965,7 +957,7 @@ export const forgotPassword = async (req, res) => {
       `,
       attachments: [{
         filename: 'logo.png',
-        path: path.join(__dirname, '../public/images/logo.png'), // 請確保這個路徑指向你的 logo 圖片
+        path: path.join(__dirname, '../public/images/logo_horizontal.png'), // 請確保這個路徑指向你的 logo 圖片
         cid: 'logo' // 這個 ID 需要和 HTML 中的 cid 匹配
       }]
     }

@@ -3,38 +3,14 @@ import User from '../models/user.js'
 import AuditLog from '../models/auditLog.js'
 import { StatusCodes } from 'http-status-codes'
 import { companyNames } from '../enums/Company.js'
-import Sequence from '../models/sequence.js'
-
+import { getNextDepartmentNumber } from '../utils/sequence.js'
 // 創建部門
 export const create = async (req, res) => {
   try {
     const { name, companyId } = req.body
 
-    // 獲取該公司的最後一個部門編號
-    const sequence = await Sequence.findOne({
-      name: `department_${companyId}`
-    })
-
-    let sequenceValue
-    if (!sequence) {
-      // 如果是該公司的第一個部門，創建新的序列
-      const newSequence = await Sequence.create({
-        name: `department_${companyId}`,
-        value: 1
-      })
-      sequenceValue = newSequence.value
-    } else {
-      // 如果已有序列，增加值
-      const updatedSequence = await Sequence.findOneAndUpdate(
-        { name: `department_${companyId}` },
-        { $inc: { value: 1 } },
-        { new: true }
-      )
-      sequenceValue = updatedSequence.value
-    }
-
-    // 生成部門ID: 公司ID + 兩位數序號
-    const departmentId = `${companyId}${String(sequenceValue).padStart(2, '0')}`
+    // 使用新的方法獲取部門編號
+    const departmentId = await getNextDepartmentNumber(companyId)
 
     // 創建部門
     const department = await Department.create({
@@ -43,6 +19,7 @@ export const create = async (req, res) => {
       departmentId
     })
 
+    // 記錄審計日誌（這部分不變）
     await AuditLog.create({
       operatorId: req.user._id,
       operatorInfo: {

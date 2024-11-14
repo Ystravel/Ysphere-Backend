@@ -206,7 +206,7 @@ schema.index(
   {
     sparse: true,
     background: true,
-    expireAfterSeconds: 86400 // 24小時後自動刪除過期的重置token
+    expireAfterSeconds: 1800 // 30分鐘後自動刪除過期的重置token
   }
 )
 
