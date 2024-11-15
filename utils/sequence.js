@@ -1,6 +1,6 @@
-// utils/sequenceUtils.js
 import User from '../models/user.js'
 import Department from '../models/department.js'
+import ServiceTicket from '../models/serviceTicket.js'
 
 /**
  * 獲取下一個可用的員工編號
@@ -51,4 +51,38 @@ export const getNextDepartmentNumber = async (companyId) => {
   const maxNumber = Math.max(...numbers)
   // 返回下一個序號，格式為 "公司ID + 兩位數序號"
   return `${companyId}${String(maxNumber + 1).padStart(2, '0')}`
+}
+
+/**
+ * 獲取下一個可用的服務請求編號
+ * @returns {Promise<string>} 格式化的服務請求編號 (例如: 'IT-2024050001')
+ */
+export const getNextTicketNumber = async () => {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  const prefix = `IT-${year}${month}`
+
+  // 查找當月的所有服務請求
+  const tickets = await ServiceTicket.find({
+    ticketId: new RegExp(`^${prefix}`)
+  }, { ticketId: 1 })
+
+  // 提取序號部分
+  const numbers = tickets
+    .map(ticket => {
+      const match = ticket.ticketId.match(/\d{4}$/)
+      return match ? parseInt(match[0]) : 0
+    })
+    .filter(num => !isNaN(num))
+
+  // 如果當月沒有請求，從 1 開始
+  if (numbers.length === 0) {
+    return `${prefix}0001`
+  }
+
+  // 找到最大的序號
+  const maxNumber = Math.max(...numbers)
+  // 返回下一個序號，格式為 "IT-年月+四位數序號"
+  return `${prefix}${String(maxNumber + 1).padStart(4, '0')}`
 }
