@@ -54,6 +54,7 @@ export const getAll = async (req, res) => {
       status,
       category,
       priority,
+      requesterId,
       search
     } = req.query
 
@@ -63,44 +64,108 @@ export const getAll = async (req, res) => {
     if (status) query.status = status
     if (category) query.category = category
     if (priority) query.priority = priority
+    if (requesterId) query.requesterId = requesterId
 
     // 如果不是 IT/ADMIN/SUPER_ADMIN，只能看到自己的請求
     if (![UserRole.IT, UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(req.user.role)) {
       query.requesterId = req.user._id
     }
 
+    // 文字搜尋條件
     if (search) {
-      query.$or = [
-        { ticketId: new RegExp(search, 'i') },
-        { title: new RegExp(search, 'i') },
-        { description: new RegExp(search, 'i') },
-        { location: new RegExp(search, 'i') }
+      // 使用聚合查詢來處理關聯資料的搜尋
+      const pipeline = [
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'requesterId',
+            foreignField: '_id',
+            as: 'requester'
+          }
+        },
+        {
+          $unwind: '$requester'
+        },
+        {
+          $match: {
+            $or: [
+              { ticketId: new RegExp(search, 'i') },
+              { title: new RegExp(search, 'i') },
+              { location: new RegExp(search, 'i') },
+              { description: new RegExp(search, 'i') },
+              { 'requester.extNumber': new RegExp(search, 'i') }
+            ]
+          }
+        }
       ]
-    }
 
-    const total = await ServiceTicket.countDocuments(query)
-    const tickets = await ServiceTicket.find(query)
-      .populate('requesterId', 'name userId')
-      .populate('assigneeId', 'name userId')
-      .sort(sort)
-      .skip((page - 1) * limit)
-      .limit(limit)
+      if (status) pipeline.push({ $match: { status } })
+      if (category) pipeline.push({ $match: { category } })
+      if (priority) pipeline.push({ $match: { priority } })
+      if (requesterId) pipeline.push({ $match: { requesterId } })
 
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: '',
-      result: {
-        data: tickets,
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit)
+      // 如果不是 IT/ADMIN/SUPER_ADMIN，只能看到自己的請求
+      if (![UserRole.IT, UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(req.user.role)) {
+        pipeline.push({ $match: { requesterId: req.user._id } })
       }
-    })
+
+      // 計算總數
+      const countPipeline = [...pipeline, { $count: 'total' }]
+      const totalResult = await ServiceTicket.aggregate(countPipeline)
+      const total = totalResult[0]?.total || 0
+
+      // 加入分頁和排序
+      pipeline.push(
+        { $sort: { [sort.replace('-', '')]: sort.startsWith('-') ? -1 : 1 } },
+        { $skip: (page - 1) * limit },
+        { $limit: parseInt(limit) }
+      )
+
+      const tickets = await ServiceTicket.aggregate(pipeline)
+
+      // 重新 populate assigneeId
+      const populatedTickets = await ServiceTicket.populate(tickets, [
+        { path: 'requesterId', select: 'name userId extNumber' },
+        { path: 'assigneeId', select: 'name userId' }
+      ])
+
+      res.status(StatusCodes.OK).json({
+        success: true,
+        message: '',
+        result: {
+          data: populatedTickets,
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit)
+        }
+      })
+    } else {
+      // 如果沒有搜尋文字，使用原本的查詢方式
+      const total = await ServiceTicket.countDocuments(query)
+      const tickets = await ServiceTicket.find(query)
+        .populate('requesterId', 'name userId extNumber')
+        .populate('assigneeId', 'name userId')
+        .sort(sort)
+        .skip((page - 1) * limit)
+        .limit(limit)
+
+      res.status(StatusCodes.OK).json({
+        success: true,
+        message: '',
+        result: {
+          data: tickets,
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit)
+        }
+      })
+    }
   } catch (error) {
     console.error('獲取服務請求列表失敗:', error)
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
-      message: '獲取服務請求列表失敗'
+      message: '獲取服務請求列表失敗',
+      error: error.message // 加入詳細錯誤訊息
     })
   }
 }
@@ -171,9 +236,18 @@ export const update = async (req, res) => {
     }
 
     const oldStatus = ticket.status
+
+    // 如果要更新狀態為已完成，檢查是否有處理方案
+    if (req.body.status === '已完成' && !ticket.solution && !req.body.solution) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '請先填寫處理方案再將狀態更改為已完成'
+      })
+    }
+
     Object.assign(ticket, req.body)
 
-    // 如果狀態改為已完成，刪除所有圖片
+    // 如果狀態改為已完成，且有附件需要刪除
     if (ticket.status === '已完成' && oldStatus !== '已完成' && ticket.attachments.length > 0) {
       for (const attachment of ticket.attachments) {
         await cloudinary.uploader.destroy(attachment.publicId)
@@ -233,20 +307,20 @@ export const deleteImage = async (req, res) => {
       return res.status(404).json({ success: false, message: '找不到該服務請求' })
     }
 
-    // 修改這裡的比對邏輯
     const fullPublicId = `tickets/${publicId}`
-    const attachmentIndex = ticket.attachments.findIndex(att => att.publicId === fullPublicId)
 
-    if (attachmentIndex === -1) {
-      return res.status(404).json({ success: false, message: '找不到該圖片' })
-    }
+    // 使用 MongoDB 的 $pull 操作符直接更新文檔
+    await ServiceTicket.findByIdAndUpdate(
+      ticketId,
+      {
+        $pull: {
+          attachments: { publicId: fullPublicId }
+        }
+      }
+    )
 
-    // 使用完整的 publicId 進行刪除
+    // 從 Cloudinary 刪除圖片
     await cloudinary.uploader.destroy(fullPublicId)
-
-    // 從資料庫中移除附件
-    ticket.attachments.splice(attachmentIndex, 1)
-    await ticket.save()
 
     res.status(200).json({ success: true, message: '圖片刪除成功' })
   } catch (error) {

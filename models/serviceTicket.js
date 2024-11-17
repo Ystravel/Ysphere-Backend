@@ -48,23 +48,37 @@ const serviceTicketSchema = new Schema({
     publicId: String
   }],
   solution: {
-    type: String
+    type: String,
+    required: [
+      function () { return this.status === '已完成' },
+      '已完成的請求必須填寫處理方案'
+    ]
+  },
+  solutionUpdatedAt: {
+    type: Date
   }
 }, {
   timestamps: true,
   versionKey: false
 })
 
-// 狀態變更時的中間件，當狀態改為已完成時刪除圖片
-serviceTicketSchema.pre('save', async function (next) {
-  if (this.isModified('status') && this.status === '已完成' && this.attachments?.length > 0) {
-    try {
-      this._deleteAttachments = true // 標記需要刪除
-    } catch (error) {
-      console.error('標記刪除附件時發生錯誤:', error)
-      return next(error)
+// 狀態更新中間件
+serviceTicketSchema.pre('save', function (next) {
+  if (this.isModified('solution')) {
+    this.solutionUpdatedAt = new Date()
+  }
+
+  if (this.isModified('status')) {
+    if (this.status === '已完成' && !this.solution) {
+      const err = new Error('已完成的請求必須填寫處理方案')
+      return next(err)
+    }
+
+    if (this.status === '已完成' && this.attachments?.length > 0) {
+      this._deleteAttachments = true
     }
   }
+
   next()
 })
 

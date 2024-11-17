@@ -82,7 +82,7 @@ export const getAll = async (req, res) => {
     const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1
     const search = req.query.search || ''
     const companyId = req.query.companyId
-    const searchFields = req.query.searchFields || ['name'] // 添加搜尋欄位參數
+    const searchFields = req.query.searchFields || ['name', 'departmentId'] // 修改默認搜尋欄位
 
     // 構建查詢條件
     const query = {}
@@ -91,12 +91,26 @@ export const getAll = async (req, res) => {
     if (search) {
       if (Array.isArray(searchFields)) {
         // 如果有指定多個搜尋欄位，建立 $or 查詢
-        query.$or = searchFields.map(field => ({
-          [field]: new RegExp(search, 'i')
-        }))
+        query.$or = searchFields.map(field => {
+          // 根據欄位類型決定查詢方式
+          if (field === 'departmentId') {
+            // 部門編號可能是完全匹配或包含關係
+            return {
+              [field]: new RegExp(search, 'i')
+            }
+          } else {
+            // 其他欄位使用模糊查詢
+            return {
+              [field]: new RegExp(search, 'i')
+            }
+          }
+        })
       } else {
-        // 預設搜尋名稱
-        query.name = new RegExp(search, 'i')
+        // 預設搜尋名稱和部門編號
+        query.$or = [
+          { name: new RegExp(search, 'i') },
+          { departmentId: new RegExp(search, 'i') }
+        ]
       }
     }
 

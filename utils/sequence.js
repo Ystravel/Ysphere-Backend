@@ -55,13 +55,13 @@ export const getNextDepartmentNumber = async (companyId) => {
 
 /**
  * 獲取下一個可用的服務請求編號
- * @returns {Promise<string>} 格式化的服務請求編號 (例如: 'IT-2024050001')
+ * @returns {Promise<string>} 格式化的服務請求編號 (例如: 'IT24110001')
  */
 export const getNextTicketNumber = async () => {
   const today = new Date()
-  const year = today.getFullYear()
+  const year = today.getFullYear().toString().slice(-2) // 只取年份後兩位
   const month = String(today.getMonth() + 1).padStart(2, '0')
-  const prefix = `IT-${year}${month}`
+  const prefix = `IT${year}${month}`
 
   // 查找當月的所有服務請求
   const tickets = await ServiceTicket.find({
@@ -83,6 +83,6 @@ export const getNextTicketNumber = async () => {
 
   // 找到最大的序號
   const maxNumber = Math.max(...numbers)
-  // 返回下一個序號，格式為 "IT-年月+四位數序號"
+  // 返回下一個序號
   return `${prefix}${String(maxNumber + 1).padStart(4, '0')}`
 }

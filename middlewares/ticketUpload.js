@@ -14,7 +14,7 @@ const storage = new CloudinaryStorage({
   cloudinary,
   params: {
     folder: 'tickets', // 存在 tickets 資料夾
-    allowed_formats: ['jpg', 'png', 'jpeg'],
+    allowed_formats: ['jpg', 'png', 'jpeg', 'webp'], // 允許的格式
     transformation: [{ width: 800, height: 800, crop: 'limit' }] // 限制最大尺寸，保持原比例
   }
 })
@@ -23,7 +23,7 @@ const storage = new CloudinaryStorage({
 const ticketUpload = multer({
   storage,
   fileFilter (req, file, callback) {
-    if (['image/jpeg', 'image/png'].includes(file.mimetype)) {
+    if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
       callback(null, true)
     } else {
       callback(new Error('FORMAT'), false)

@@ -13,7 +13,7 @@ const storage = new CloudinaryStorage({
   cloudinary,
   params: {
     folder: 'avatars', // 指定 Cloudinary 上的文件夾
-    allowed_formats: ['jpg', 'png'], // 允許的格式
+    allowed_formats: ['jpg', 'png', 'webp'], // 允許的格式
     transformation: [{ width: 200, height: 200, crop: 'fill' }] // 圖片處理設置
   }
 })
@@ -22,14 +22,14 @@ const storage = new CloudinaryStorage({
 const upload = multer({
   storage,
   fileFilter (req, file, callback) {
-    if (['image/jpeg', 'image/png'].includes(file.mimetype)) {
+    if (['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
       callback(null, true)
     } else {
       callback(new Error('FORMAT'), false)
     }
   },
   limits: {
-    fileSize: 1024 * 1024 // 1MB
+    fileSize: 2 * 1024 * 1024 // 1MB
   }
 }).single('image') // 使用 single() 而不是創建一個中間件函數
 
