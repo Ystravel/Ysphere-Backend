@@ -914,7 +914,7 @@ export const forgotPassword = async (req, res) => {
 
     await user.save()
 
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`
+    const resetUrl = `${process.env.FRONTEND_URL}/#/reset-password/${resetToken}`
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
