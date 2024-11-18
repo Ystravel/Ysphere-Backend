@@ -13,11 +13,11 @@ const serviceTicketSchema = new Schema({
   },
   title: {
     type: String,
-    required: [true, '請輸入問題標題']
+    required: [true, '請輸入標題']
   },
   description: {
     type: String,
-    required: [true, '請描述問題內容']
+    required: [true, '請描述問題描述']
   },
   category: {
     type: String,

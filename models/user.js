@@ -30,16 +30,24 @@ const todoSchema = new Schema({
     default: '待處理'
   },
   reminder: {
+    enabled: { // 是否啟用提醒
+      type: Boolean,
+      default: false
+    },
     time: Date, // 提醒時間
     isNotified: { // 是否已發送通知
       type: Boolean,
       default: false
+    },
+    repeatType: { // 重複類型
+      type: String,
+      enum: ['一次性', '每天', '每週', '每月'],
+      default: '一次性'
     }
-  },
-  created: {
-    type: Date,
-    default: Date.now
   }
+}, {
+  timestamps: true, // 待辦事項建立時間、更新時間
+  versionKey: false
 })
 
 const schema = new Schema({

@@ -34,12 +34,12 @@ router.post('/', auth.jwt, checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]), cr
 
 router.patch('/change-password', auth.jwt, changePassword)
 // 取得所有用戶資料（僅限 ADMIN 和 SUPER_ADMIN）
-router.get('/all', auth.jwt, checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.ACCOUNTANT]), getAll)
+router.get('/all', auth.jwt, checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.ACCOUNTANT, UserRole.IT]), getAll)
 
 // 取得當前用戶資料
 router.get('/profile', auth.jwt, profile)
 router.get('/employee-stats', auth.jwt, checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN]), getEmployeeStats)
-router.get('/suggestions', auth.jwt, checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]), getSuggestions)
+router.get('/suggestions', auth.jwt, checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.IT]), getSuggestions)
 
 // 用戶登出
 router.delete('/logout', auth.jwt, logout)

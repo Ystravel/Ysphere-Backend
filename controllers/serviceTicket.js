@@ -4,6 +4,7 @@ import ServiceTicket from '../models/serviceTicket.js'
 import validator from 'validator'
 import { getNextTicketNumber } from '../utils/sequence.js'
 import UserRole from '../enums/UserRole.js'
+import User from '../models/user.js'
 
 // 創建服務請求
 export const create = async (req, res) => {
@@ -481,23 +482,71 @@ export const updateStatus = async (req, res) => {
     const ticket = await ServiceTicket.findById(req.params.id)
 
     if (!ticket) {
-      return res.status(404).json({ success: false, message: '找不到該服務請求' })
+      return res.status(404).json({
+        success: false,
+        message: '找不到該服務請求'
+      })
     }
 
-    // 如果狀態改為 "已完成"，且有附件需要刪除
+    // 更新狀態
+    if (req.body.status) {
+      ticket.status = req.body.status
+    }
+
+    // 更新處理者
+    if (req.body.assigneeId) {
+      ticket.assigneeId = req.body.assigneeId
+    } else if (req.body.status && req.body.status !== ticket.status) {
+      // 如果更改狀態但沒有指定處理者，則設為當前用戶
+      ticket.assigneeId = req.user._id
+    }
+
+    // 處理附件
     if (req.body.status === '已完成' && ticket.attachments.length > 0) {
       for (const attachment of ticket.attachments) {
-        await cloudinary.uploader.destroy(attachment.publicId) // 假設 Cloudinary 用 `publicId`
+        await cloudinary.uploader.destroy(attachment.publicId)
       }
-      ticket.attachments = [] // 清空附件
+      ticket.attachments = []
     }
 
-    ticket.status = req.body.status
     await ticket.save()
 
-    res.status(200).json({ success: true, message: '狀態更新成功', result: ticket })
+    // 重新獲取並填充用戶資訊
+    const updatedTicket = await ServiceTicket.findById(ticket._id)
+      .populate('requesterId', 'name userId extNumber')
+      .populate('assigneeId', 'name userId')
+
+    res.status(200).json({
+      success: true,
+      message: '服務請求更新成功',
+      result: updatedTicket
+    })
   } catch (error) {
-    console.error('更新狀態失敗:', error)
-    res.status(500).json({ success: false, message: '更新狀態失敗' })
+    console.error('更新服務請求失敗:', error)
+    res.status(500).json({
+      success: false,
+      message: '更新服務請求失敗'
+    })
+  }
+}
+
+export const getAvailableAssignees = async (req, res) => {
+  try {
+    const assignees = await User.find({
+      role: [UserRole.IT, UserRole.ADMIN, UserRole.SUPER_ADMIN],
+      employmentStatus: '在職'
+    }).select('name userId')
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '',
+      result: assignees
+    })
+  } catch (error) {
+    console.error('獲取可用處理者清單失敗:', error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '獲取可用處理者清單失敗'
+    })
   }
 }

@@ -10,7 +10,8 @@ import {
   deleteTicket,
   getStats,
   getMyTickets,
-  userUpdate
+  userUpdate,
+  getAvailableAssignees
 } from '../controllers/serviceTicket.js'
 import * as auth from '../middlewares/auth.js'
 import { checkTicketOwner, checkTicketStatus } from '../middlewares/ticketCheck.js'
@@ -38,6 +39,13 @@ router.get('/stats',
   auth.jwt,
   checkRole([UserRole.IT, UserRole.ADMIN, UserRole.SUPER_ADMIN]),
   getStats
+)
+
+// (新增) 獲取可用處理者清單 (僅限 IT/ADMIN/SUPER_ADMIN)
+router.get('/assignees',
+  auth.jwt,
+  checkRole([UserRole.IT, UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+  getAvailableAssignees
 )
 
 // 獲取所有維修請求 (僅限 IT/ADMIN/SUPER_ADMIN)
