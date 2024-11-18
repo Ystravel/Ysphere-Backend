@@ -129,7 +129,7 @@ export const getById = async (req, res) => {
 // 編輯部門
 export const edit = async (req, res) => {
   try {
-    const { name, companyId } = req.body
+    const { name, companyId, departmentId } = req.body
     const department = await Department.findById(req.params.id).populate('companyId', 'name')
 
     if (!department) {
@@ -139,15 +139,29 @@ export const edit = async (req, res) => {
       })
     }
 
-    if (name === department.name && companyId === department.companyId.toString()) {
+    if (departmentId) {
+      // 檢查部門編號是否已存在
+      const existingDepartment = await Department.findOne({ departmentId })
+      if (existingDepartment && existingDepartment._id.toString() !== department._id.toString()) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: '部門編號已存在，請使用其他編號'
+        })
+      }
+    }
+
+    if (name === department.name &&
+        companyId === department.companyId.toString() &&
+        departmentId === department.departmentId) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
-        message: '部門名稱與公司未作變更'
+        message: '未進行任何修改'
       })
     }
 
     const changes = {}
     if (name !== department.name) changes.name = { from: department.name, to: name }
+    if (departmentId !== department.departmentId) changes.departmentId = { from: department.departmentId, to: departmentId }
     if (companyId !== department.companyId.toString()) {
       const newCompany = await Company.findById(companyId)
       if (!newCompany) {
@@ -160,16 +174,24 @@ export const edit = async (req, res) => {
       changes.companyName = { from: department.companyId.name, to: newCompany.name }
     }
 
-    Object.assign(department, { name, companyId })
+    // 更新部門資料
+    Object.assign(department, { name, companyId, departmentId })
     await department.save()
 
+    // 修正 AuditLog 創建
     await AuditLog.create({
       operatorId: req.user._id,
-      operatorInfo: { name: req.user.name, userId: req.user.userId },
+      operatorInfo: {
+        name: req.user.name,
+        userId: req.user.userId
+      },
       action: '修改',
       targetId: department._id,
-      targetInfo: { name: department.name, departmentId: department.departmentId },
       targetModel: 'departments',
+      targetInfo: {
+        name: department.name,
+        departmentId: department.departmentId
+      },
       changes
     })
 
@@ -180,10 +202,13 @@ export const edit = async (req, res) => {
     })
   } catch (error) {
     console.error('更新部門錯誤:', error)
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+    const errorMessage = error.code === 11000
+      ? '該公司已有相同名稱的部門，請更改部門名稱'
+      : '更新部門時發生錯誤'
+    return res.status(StatusCodes.BAD_REQUEST).json({
       success: false,
-      message: '更新部門時發生錯誤',
-      error: error.message
+      message: errorMessage,
+      field: error.code === 11000 ? 'name' : undefined
     })
   }
 }
@@ -191,7 +216,8 @@ export const edit = async (req, res) => {
 // 刪除部門
 export const remove = async (req, res) => {
   try {
-    const department = await Department.findById(req.params.id)
+    const { id } = req.params
+    const department = await Department.findById(id)
     if (!department) {
       return res.status(StatusCodes.NOT_FOUND).json({
         success: false,
@@ -199,12 +225,13 @@ export const remove = async (req, res) => {
       })
     }
 
-    const memberCount = await User.countDocuments({
+    // 檢查部門是否有在職員工
+    const userCount = await User.countDocuments({
       department: department._id,
       employmentStatus: '在職'
     })
 
-    if (memberCount > 0) {
+    if (userCount > 0) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
         message: '此部門還有在職員工，無法刪除'

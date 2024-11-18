@@ -67,31 +67,35 @@ export const getNextCompanyNumber = async () => {
  * @returns {Promise<string>} 格式化的部門編號
  */
 export const getNextDepartmentNumber = async (companyId) => {
+  // 先查找公司資訊獲取公司編號
+  const company = await Company.findById(companyId)
+  if (!company) throw new Error('公司不存在')
+
   // 查找特定公司的所有部門編號
   const departments = await Department.find({ companyId }, { departmentId: 1 })
 
   // 提取部門流水號（最後兩位數字）
   const numbers = departments
     .map((dept) => {
-      const match = dept.departmentId.match(/\d{2}$/)
+      const match = dept.departmentId?.match(/\d{2}$/)
       return match ? parseInt(match[0]) : 0
     })
     .filter((num) => !isNaN(num))
 
   // 如果沒有部門，從 01 開始
   if (numbers.length === 0) {
-    return `${companyId}01`
+    return `${company.companyId}01`
   }
 
   // 找到最大的流水號
   const maxNumber = Math.max(...numbers)
 
   if (maxNumber >= 99) {
-    throw new Error(`公司 ${companyId} 的部門數量已達最大限制`)
+    throw new Error(`公司 ${company.companyId} 的部門數量已達最大限制`)
   }
 
-  // 返回下一個流水號，格式為 "公司ID + 兩位數流水號"
-  return `${companyId}${String(maxNumber + 1).padStart(2, '0')}`
+  // 返回下一個流水號，格式為 "公司編號 + 兩位數流水號"
+  return `${company.companyId}${String(maxNumber + 1).padStart(2, '0')}`
 }
 
 /**
