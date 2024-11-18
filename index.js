@@ -7,6 +7,7 @@ import mongoSanitize from 'express-mongo-sanitize'
 
 // 導入路由
 import routeUser from './routes/user.js'
+import routeCompany from './routes/company.js'
 import routeDepartment from './routes/department.js'
 import routeAuditLog from './routes/auditLog.js'
 import routeServiceTicket from './routes/serviceTicket.js'
@@ -43,6 +44,7 @@ app.use((_, req, res, next) => {
 app.use(mongoSanitize())
 
 app.use('/user', routeUser)
+app.use('/company', routeCompany)
 app.use('/department', routeDepartment)
 app.use('/auditLog', routeAuditLog)
 app.use('/serviceTicket', routeServiceTicket)

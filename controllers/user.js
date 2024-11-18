@@ -37,12 +37,16 @@ export const create = async (req, res) => {
       return res.status(StatusCodes.BAD_REQUEST).json({ message: '找不到選定的部門' })
     }
 
-    // 使用部門的 companyId 設定用戶的公司欄位
+    // 生成隨機密碼
+    const randomPassword = crypto.randomBytes(8).toString('hex')
+
     const result = await User.create({
       ...req.body,
       userId,
       department,
-      companyId: departmentData.companyId
+      companyId: departmentData.companyId,
+      password: randomPassword,
+      isFirstLogin: true
     })
 
     // 記錄審計日誌部分保持不變
@@ -130,11 +134,48 @@ export const create = async (req, res) => {
     res.status(StatusCodes.OK).json({
       success: true,
       message: '用戶創建成功',
-      result
+      result: {
+        ...result.toObject(),
+        password: undefined // 不返回密碼
+      }
     })
   } catch (error) {
     console.error('Create user error:', error)
-    handleError(res, error)
+    // 修改錯誤處理部分
+    if (error.name === 'ValidationError') {
+      const key = Object.keys(error.errors)[0]
+      const message = error.errors[key].message
+      res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message
+      })
+    } else if (error.name === 'MongoServerError' && error.code === 11000) {
+      let message = ''
+      if (error.keyValue.email) {
+        message = 'Email已註冊'
+      } else if (error.keyValue.IDNumber) {
+        message = '身分證號碼已註冊'
+      } else if (error.keyValue.cellphone) {
+        message = '手機號碼已註冊'
+      } else if (error.keyValue.extNumber) {
+        message = '分機號碼已註冊'
+      } else if (error.keyValue.printNumber) {
+        message = '列印編號已註冊'
+      } else if (error.keyValue.userId) {
+        message = '員工編號已註冊'
+      } else {
+        message = '某些欄位值已註冊'
+      }
+      res.status(StatusCodes.CONFLICT).json({
+        success: false,
+        message
+      })
+    } else {
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: '未知錯誤'
+      })
+    }
   }
 }
 
@@ -152,6 +193,17 @@ export const login = async (req, res) => {
     const token = jwt.sign({ _id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '10h' })
     req.user.tokens.push(token)
     await req.user.save()
+
+    if (req.user.isFirstLogin) {
+      return res.status(StatusCodes.OK).json({
+        success: true,
+        message: '首次登入,請修改密碼',
+        result: {
+          token,
+          isFirstLogin: true
+        }
+      })
+    }
     res.status(StatusCodes.OK).json({
       success: true,
       message: '',
@@ -684,12 +736,14 @@ export const changePassword = async (req, res) => {
       })
     }
 
-    // 驗證當前密碼
-    if (!bcrypt.compareSync(currentPassword, user.password)) {
-      return res.status(StatusCodes.BAD_REQUEST).json({
-        success: false,
-        message: '當前密碼輸入錯誤'
-      })
+    // 如果不是首次登入,驗證當前密碼
+    if (!user.isFirstLogin) {
+      if (!bcrypt.compareSync(currentPassword, user.password)) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: '當前密碼輸入錯誤'
+        })
+      }
     }
 
     // 驗證新密碼長度
@@ -702,6 +756,7 @@ export const changePassword = async (req, res) => {
 
     // 更新密碼
     user.password = newPassword // mongoose pre save hook 會自動進行 hash
+    user.isFirstLogin = false // 修改密碼後設為 false
     await user.save()
 
     // 記錄密碼變更
@@ -804,8 +859,9 @@ export const edit = async (req, res) => {
             from: originalDate,
             to: newDate
           }
-        } // 處理角色欄位
+        }
       } else if (key === 'role' && originalUser[key]?.toString() !== updateData[key]?.toString()) {
+        // 處理角色欄位
         changedFields[key] = updateData[key]
         auditChanges[key] = {
           from: roleNames[originalUser[key]] || `未知角色(${originalUser[key]})`,
@@ -832,13 +888,13 @@ export const edit = async (req, res) => {
       // 記錄變更
       await AuditLog.create({
         operatorId: req.user._id,
-        operatorInfo: { // 加入這個
+        operatorInfo: {
           name: req.user.name,
           userId: req.user.userId
         },
         action: '修改',
         targetId: user._id,
-        targetInfo: { // 加入這個
+        targetInfo: {
           name: user.name,
           userId: user.userId
         },
@@ -860,7 +916,52 @@ export const edit = async (req, res) => {
     }
   } catch (error) {
     console.error(error)
-    handleError(res, error)
+
+    // 修改錯誤處理部分
+    if (error.name === 'ValidationError') {
+      const key = Object.keys(error.errors)[0]
+      const message = error.errors[key].message
+      res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message
+      })
+    } else if (error.name === 'MongoServerError' && error.code === 11000) {
+      let message = ''
+      if (error.keyValue.email) {
+        message = 'Email已註冊'
+      } else if (error.keyValue.IDNumber) {
+        message = '身分證號碼已註冊'
+      } else if (error.keyValue.cellphone) {
+        message = '手機號碼已註冊'
+      } else if (error.keyValue.extNumber) {
+        message = '分機號碼已註冊'
+      } else if (error.keyValue.printNumber) {
+        message = '列印編號已註冊'
+      } else if (error.keyValue.userId) {
+        message = '員工編號已註冊'
+      } else {
+        message = '某些欄位值已註冊'
+      }
+      res.status(StatusCodes.CONFLICT).json({
+        success: false,
+        message
+      })
+    } else if (error.message === 'ID') {
+      res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '用戶 ID 格式錯誤'
+      })
+    } else if (error.message === 'NOT FOUND') {
+      res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: '查無用戶'
+      })
+    } else {
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: '未知錯誤'
+      })
+    }
   }
 }
 
@@ -1100,6 +1201,80 @@ export const updateAvatar = async (req, res) => {
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: '更新頭像失敗'
+    })
+  }
+}
+
+// 新增發送初始密碼的功能
+export const sendInitialPassword = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id)
+    if (!user) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: '找不到該用戶'
+      })
+    }
+
+    if (!user.isFirstLogin) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '該用戶已完成首次登入'
+      })
+    }
+
+    // 生成新的隨機密碼
+    const randomPassword = crypto.randomBytes(8).toString('hex')
+    user.password = randomPassword
+    await user.save()
+
+    // 發送郵件
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: user.email,
+      subject: 'Ysphere - 永信星球 系統初始密碼',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 400px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <h2 style="color: #333;">系統初始密碼</h2>
+          </div>
+          
+          <div style="background: #f7f7f7; padding: 28px; border-radius: 5px; margin-bottom: 20px;">
+            <p style="margin-top: 0; font-size: 14px; font-weight: 600">${user.name} 您好，</p>
+            <p style="font-size: 14px; font-weight: 500">這是您的系統初始密碼：</p>
+            <div style="text-align: center; margin: 20px 0;">
+              <div style="background: #eee; padding: 12px; border-radius: 4px; font-size: 18px; font-family: monospace;">
+                ${randomPassword}
+              </div>
+            </div>
+            <p style="color: #666; font-size: 13px;">
+              請使用此密碼進行首次登入，系統會要求您立即修改密碼。
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 30px;">
+            <p style="color: #666; margin-bottom: 20px;">Ysphere ERP System</p>
+            <img src="cid:logo" alt="YSTravel Logo" style="max-width: 150px; height: auto;">
+          </div>
+
+          <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
+            <p>此為系統自動發送的郵件，請勿直接回覆</p>
+          </div>
+        </div>
+      `
+    }
+
+    await transporter.sendMail(mailOptions)
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '初始密碼已發送成功'
+    })
+  } catch (error) {
+    console.error('發送初始密碼錯誤:', error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '發送初始密碼失敗'
     })
   }
 }

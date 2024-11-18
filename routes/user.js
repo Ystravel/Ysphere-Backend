@@ -14,7 +14,8 @@ import {
   resetPassword,
   updateAvatar,
   remove,
-  getSuggestions
+  getSuggestions,
+  sendInitialPassword
 } from '../controllers/user.js'
 import * as auth from '../middlewares/auth.js'
 import checkRole from '../middlewares/checkRole.js'
@@ -27,7 +28,7 @@ const router = Router()
 router.post('/login', auth.login, login)
 
 // 用戶註冊（僅限 ADMIN 和 SUPER_ADMIN）
-router.post('/', auth.jwt, checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]), create)
+router.post('/', auth.jwt, checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.HR]), create)
 
 // 延長登入 token
 // router.patch('/extend', auth.jwt, extend)
@@ -46,7 +47,11 @@ router.delete('/logout', auth.jwt, logout)
 
 // Google 登入
 router.post('/google-login', googleLogin)
-
+router.post('/:id/send-initial-password',
+  auth.jwt,
+  checkRole([UserRole.HR, UserRole.SUPER_ADMIN]),
+  sendInitialPassword
+)
 // 編輯用戶資料（僅限 ADMIN 和 SUPER_ADMIN）
 router.patch('/avatar', auth.jwt, upload, updateAvatar)
 

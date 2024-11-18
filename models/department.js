@@ -1,4 +1,4 @@
-import { Schema, model } from 'mongoose'
+import { Schema, model, ObjectId } from 'mongoose'
 
 const departmentSchema = new Schema({
   name: {
@@ -9,10 +9,10 @@ const departmentSchema = new Schema({
     type: String,
     unique: true
   },
-  companyId: {
-    type: Number,
-    required: [true, '請選擇所屬公司'],
-    enum: [1, 2, 3, 4, 5, 6, 7, 8] // 限制可用的公司 ID
+  companyId: { // 參考新的 Company 模型
+    type: ObjectId,
+    ref: 'companies',
+    required: [true, '請選擇所屬公司']
   }
 }, {
   timestamps: true,
