@@ -6,9 +6,9 @@ import jwt from 'jsonwebtoken'
 import validator from 'validator'
 import AuditLog from '../models/auditLog.js'
 import { getNextUserNumber } from '../utils/sequence.js'
-import Department from '../models/department.js'
+import Company from '../models/company.js' // 新增
 import { roleNames } from '../enums/UserRole.js'
-import { companyNames } from '../enums/Company.js'
+import Department from '../models/department.js' // 新增
 import bcrypt from 'bcrypt'
 import crypto from 'crypto'
 import nodemailer from 'nodemailer'
@@ -26,30 +26,33 @@ const transporter = nodemailer.createTransport({
 
 export const create = async (req, res) => {
   try {
-    // 使用新的方法獲取用戶編號
     const userId = await getNextUserNumber()
 
-    // 從請求中提取 department ID
-    const { department } = req.body
+    // 從請求中提取公司 ID
+    const { company, department } = req.body
+    const companyData = await Company.findById(company)
     const departmentData = await Department.findById(department)
+
+    if (!companyData) {
+      return res.status(StatusCodes.BAD_REQUEST).json({ message: '找不到選定的公司' })
+    }
 
     if (!departmentData) {
       return res.status(StatusCodes.BAD_REQUEST).json({ message: '找不到選定的部門' })
     }
 
-    // 生成隨機密碼
     const randomPassword = crypto.randomBytes(8).toString('hex')
 
     const result = await User.create({
       ...req.body,
       userId,
+      company,
       department,
-      companyId: departmentData.companyId,
       password: randomPassword,
       isFirstLogin: true
     })
 
-    // 記錄審計日誌部分保持不變
+    // 更完整的變更記錄
     const changes = {
       name: {
         from: null,
@@ -71,13 +74,13 @@ export const create = async (req, res) => {
         from: null,
         to: result.IDNumber
       },
+      company: {
+        from: null,
+        to: companyData.name
+      },
       department: {
         from: null,
         to: departmentData.name
-      },
-      company: {
-        from: null,
-        to: companyNames[departmentData.companyId]
       },
       role: {
         from: null,
@@ -86,10 +89,50 @@ export const create = async (req, res) => {
       employmentStatus: {
         from: null,
         to: result.employmentStatus
+      },
+      salary: {
+        from: null,
+        to: result.salary
+      },
+      cowellAccount: {
+        from: null,
+        to: result.cowellAccount
+      },
+      cowellPassword: {
+        from: null,
+        to: result.cowellPassword
+      },
+      englishName: {
+        from: null,
+        to: result.englishName
+      },
+      permanentAddress: {
+        from: null,
+        to: result.permanentAddress
+      },
+      contactAddress: {
+        from: null,
+        to: result.contactAddress
+      },
+      emergencyName: {
+        from: null,
+        to: result.emergencyName
+      },
+      emergencyCellphone: {
+        from: null,
+        to: result.emergencyCellphone
+      },
+      emergencyRelationship: {
+        from: null,
+        to: result.emergencyRelationship
+      },
+      hireDate: {
+        from: null,
+        to: result.hireDate
       }
     }
 
-    // 加入可選欄位
+    // 添加可選欄位
     if (result.jobTitle) {
       changes.jobTitle = {
         from: null,
@@ -114,6 +157,18 @@ export const create = async (req, res) => {
         to: result.birthDate
       }
     }
+    if (result.printNumber) {
+      changes.printNumber = {
+        from: null,
+        to: result.printNumber
+      }
+    }
+    if (result.guideLicense !== undefined) {
+      changes.guideLicense = {
+        from: null,
+        to: result.guideLicense
+      }
+    }
 
     await AuditLog.create({
       operatorId: req.user._id,
@@ -125,7 +180,9 @@ export const create = async (req, res) => {
       targetId: result._id,
       targetInfo: {
         name: result.name,
-        userId: result.userId
+        userId: result.userId,
+        departmentId: departmentData.departmentId,
+        companyId: companyData.companyId
       },
       targetModel: 'users',
       changes
@@ -136,12 +193,11 @@ export const create = async (req, res) => {
       message: '用戶創建成功',
       result: {
         ...result.toObject(),
-        password: undefined // 不返回密碼
+        password: undefined
       }
     })
   } catch (error) {
     console.error('Create user error:', error)
-    // 修改錯誤處理部分
     if (error.name === 'ValidationError') {
       const key = Object.keys(error.errors)[0]
       const message = error.errors[key].message
@@ -163,6 +219,8 @@ export const create = async (req, res) => {
         message = '列印編號已註冊'
       } else if (error.keyValue.userId) {
         message = '員工編號已註冊'
+      } else if (error.keyValue.cowellAccount) {
+        message = '科威帳號已註冊'
       } else {
         message = '某些欄位值已註冊'
       }
@@ -178,11 +236,10 @@ export const create = async (req, res) => {
     }
   }
 }
-
 // 用戶登入
+
 export const login = async (req, res) => {
   try {
-    // 檢查使用者狀態
     if (req.user.employmentStatus !== '在職') {
       return res.status(StatusCodes.FORBIDDEN).json({
         success: false,
@@ -220,14 +277,16 @@ export const login = async (req, res) => {
         emergencyName: req.user.emergencyName,
         emergencyCellphone: req.user.emergencyCellphone,
         userId: req.user.userId,
-        department: req.user.department,
+        company: req.user.company,
         hireDate: req.user.hireDate,
         extNumber: req.user.extNumber,
         printNumber: req.user.printNumber,
         guideLicense: req.user.guideLicense,
         role: req.user.role,
         jobTitle: req.user.jobTitle,
-        avatar: req.user.avatar
+        avatar: req.user.avatar,
+        cowellAccount: req.user.cowellAccount,
+        cowellPassword: req.user.cowellPassword
       }
     })
   } catch (error) {
@@ -242,7 +301,7 @@ export const login = async (req, res) => {
 const oauth2Client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
-  'postmessage' // 重要：使用 postmessage 作為重導向 URI
+  'postmessage'
 )
 // Google 驗證回調
 export const googleLogin = async (req, res) => {
@@ -258,8 +317,7 @@ export const googleLogin = async (req, res) => {
     const payload = ticket.getPayload()
     const email = payload.email
 
-    // 查找用戶
-    const user = await User.findOne({ email }).populate('department')
+    const user = await User.findOne({ email }).populate('company')
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -267,7 +325,6 @@ export const googleLogin = async (req, res) => {
       })
     }
 
-    // 檢查用戶狀態
     if (user.employmentStatus !== '在職') {
       return res.status(StatusCodes.FORBIDDEN).json({
         success: false,
@@ -298,14 +355,16 @@ export const googleLogin = async (req, res) => {
         emergencyName: user.emergencyName,
         emergencyCellphone: user.emergencyCellphone,
         userId: user.userId,
-        department: user.department,
+        company: user.company,
         hireDate: user.hireDate,
         extNumber: user.extNumber,
         printNumber: user.printNumber,
         guideLicense: user.guideLicense,
         role: user.role,
         jobTitle: user.jobTitle,
-        avatar: user.avatar
+        avatar: user.avatar,
+        cowellAccount: user.cowellAccount,
+        cowellPassword: user.cowellPassword
       }
     })
   } catch (error) {
@@ -346,8 +405,9 @@ export const googleLogin = async (req, res) => {
 // 取得當前用戶資料
 export const profile = async (req, res) => {
   try {
-    // 使用 populate 來填充部門資訊
-    const user = await User.findById(req.user._id).populate('department')
+    const user = await User.findById(req.user._id)
+      .populate('company', 'name') // populate 公司資訊
+      .populate('department', 'name companyId') // populate 部門資訊
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -364,7 +424,8 @@ export const profile = async (req, res) => {
         birthDate: user.birthDate,
         permanentAddress: user.permanentAddress,
         contactAddress: user.contactAddress,
-        department: user.department, // 現在這裡會包含完整的部門資訊
+        department: user.department,
+        company: user.company,
         jobTitle: user.jobTitle,
         role: user.role,
         userId: user.userId,
@@ -373,11 +434,9 @@ export const profile = async (req, res) => {
         emergencyCellphone: user.emergencyCellphone,
         printNumber: user.printNumber,
         guideLicense: user.guideLicense,
-        avatar: user.avatar
-        // cowellAccount: user.cowellAccount,
-        // cowellPassword: user.cowellPassword,
-        // nasAccount: user.nasAccount,
-        // nasPassword: user.nasPassword
+        avatar: user.avatar,
+        cowellAccount: user.cowellAccount,
+        cowellPassword: user.cowellPassword
       }
     })
   } catch (error) {
@@ -391,43 +450,50 @@ export const getAll = async (req, res) => {
     const itemsPerPage = req.query.itemsPerPage * 1 || 10
     const page = parseInt(req.query.page) || 1
 
-    // 獲取所有查詢參數
     const {
       search,
       quickSearch,
       role,
-      companyId,
-      department,
+      companyId, // 使用 companyId
+      departmentId, // 使用 departmentId
       gender,
       guideLicense,
       employmentStatus
     } = req.query
 
-    // 構建查詢管道
-    const pipeline = [
-      // 關聯部門集合
-      {
-        $lookup: {
-          from: 'departments',
-          localField: 'department',
-          foreignField: '_id',
-          as: 'departmentData'
-        }
-      },
-      {
-        $unwind: {
-          path: '$departmentData',
-          preserveNullAndEmptyArrays: true
-        }
-      }
-    ]
+    // 構建查詢條件
+    const query = {}
 
-    // 構建匹配條件
-    const matchConditions = []
+    // 這裡先處理與 OR 無關的查詢條件
+    if (role !== undefined && role !== '') {
+      query.role = Number(role)
+    }
 
-    // 基本搜尋條件
+    if (companyId && companyId !== '') {
+      query.company = new mongoose.Types.ObjectId(companyId)
+    }
+
+    if (departmentId && departmentId !== '') {
+      query.department = new mongoose.Types.ObjectId(departmentId)
+    }
+
+    if (gender !== undefined && gender !== '') {
+      query.gender = gender
+    }
+
+    if (guideLicense !== undefined && guideLicense !== '') {
+      query.guideLicense = guideLicense === 'true'
+    }
+
+    if (employmentStatus !== undefined && employmentStatus !== '') {
+      query.employmentStatus = employmentStatus
+    }
+
+    // 處理搜尋條件
+    const searchConditions = []
+
     if (search) {
-      matchConditions.push({
+      searchConditions.push({
         $or: [
           { name: new RegExp(search, 'i') },
           { englishName: new RegExp(search, 'i') },
@@ -437,116 +503,54 @@ export const getAll = async (req, res) => {
           { extNumber: new RegExp(search, 'i') },
           { printNumber: new RegExp(search, 'i') },
           { jobTitle: new RegExp(search, 'i') },
-          { note: new RegExp(search, 'i') },
-          { 'departmentData.name': new RegExp(search, 'i') },
-          {
-            'departmentData.companyId': {
-              $in: Object.keys(companyNames)
-                .filter(key => companyNames[key].match(new RegExp(search, 'i')))
-                .map(Number)
-            }
-          }
+          { note: new RegExp(search, 'i') }
         ]
       })
     }
 
-    // 快速搜尋條件
     if (quickSearch) {
-      matchConditions.push({
+      searchConditions.push({
         $or: [
           { name: new RegExp(quickSearch, 'i') },
           { userId: new RegExp(quickSearch, 'i') },
           { cellphone: new RegExp(quickSearch, 'i') },
           { extNumber: new RegExp(quickSearch, 'i') },
           { email: new RegExp(quickSearch, 'i') },
-          { printNumber: new RegExp(quickSearch, 'i') },
-          { note: new RegExp(quickSearch, 'i') },
-          { jobTitle: new RegExp(quickSearch, 'i') }
+          { printNumber: new RegExp(quickSearch, 'i') }
         ]
       })
     }
 
-    // 其他篩選條件
-    if (role !== undefined && role !== '') {
-      matchConditions.push({ role: Number(role) })
+    // 組合所有查詢條件
+    const finalQuery = { ...query }
+    if (searchConditions.length > 0) {
+      finalQuery.$and = searchConditions
     }
-
-    if (companyId !== undefined && companyId !== '') {
-      matchConditions.push({ 'departmentData.companyId': Number(companyId) })
-    }
-
-    if (department !== undefined && department !== '') {
-      matchConditions.push({ department: new mongoose.Types.ObjectId(department) })
-    }
-
-    if (gender !== undefined && gender !== '') {
-      matchConditions.push({ gender })
-    }
-
-    if (guideLicense !== undefined && guideLicense !== '') {
-      matchConditions.push({ guideLicense: guideLicense === 'true' })
-    }
-
-    if (employmentStatus !== undefined && employmentStatus !== '') {
-      matchConditions.push({ employmentStatus })
-    }
-
-    // 確保至少有一個條件
-    if (matchConditions.length === 0) {
-      matchConditions.push({}) // 添加空對象作為默認條件
-    }
-
-    // 添加 $match 階段
-    pipeline.push({
-      $match: {
-        $and: matchConditions
-      }
-    })
-
-    // 處理排序邏輯
-    const sortBy = req.query.sortBy || 'userId'
-    const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1
-
-    // 根據不同的排序欄位設定不同的排序邏輯
-    let sortStage
-    if (sortBy === 'department.name') {
-      sortStage = { $sort: { 'departmentData.name': sortOrder } }
-    } else if (sortBy === 'department.companyId') {
-      sortStage = { $sort: { 'departmentData.companyId': sortOrder } }
-    } else {
-      sortStage = { $sort: { [sortBy]: sortOrder } }
-    }
-
-    pipeline.push(sortStage)
 
     // 計算總數
-    const countPipeline = [...pipeline]
-    const [{ total } = { total: 0 }] = await User.aggregate([
-      ...countPipeline,
-      { $count: 'total' }
-    ])
+    const total = await User.countDocuments(finalQuery)
 
-    // 添加分頁
-    pipeline.push(
-      { $skip: (page - 1) * itemsPerPage },
-      { $limit: itemsPerPage }
-    )
+    // 構建排序條件
+    const sortBy = req.query.sortBy || 'userId'
+    const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1
+    const sort = { [sortBy]: sortOrder }
 
-    // 執行最終查詢
-    const result = await User.aggregate(pipeline)
+    // 獲取資料並 populate 關聯
+    const result = await User.find(finalQuery)
+      .populate('company', 'name companyId')
+      .populate('department', 'name departmentId')
+      .sort(sort)
+      .skip((page - 1) * itemsPerPage)
+      .limit(itemsPerPage)
 
-    // 重新填充部門資訊
-    const data = await User.populate(result, {
-      path: 'department',
-      select: 'name companyId'
-    })
+    console.log('Query:', finalQuery) // 加入這行來檢查查詢條件
+    console.log('Result count:', result.length) // 加入這行來檢查結果數量
 
-    // 格式化響應
     res.status(StatusCodes.OK).json({
       success: true,
       message: '',
       result: {
-        data,
+        data: result,
         totalItems: total || 0,
         itemsPerPage,
         currentPage: page
@@ -596,7 +600,7 @@ export const getSuggestions = async (req, res) => {
 
 export const getEmployeeStats = async (req, res) => {
   try {
-    // 獲取所有在職員工的公司分佈
+    // 使用 aggregation pipeline 來獲取所有在職員工的公司分佈
     const companyStats = await User.aggregate([
       {
         $match: {
@@ -604,20 +608,27 @@ export const getEmployeeStats = async (req, res) => {
         }
       },
       {
+        // 關聯 companies 集合
         $lookup: {
-          from: 'departments',
-          localField: 'department',
+          from: 'companies',
+          localField: 'company',
           foreignField: '_id',
-          as: 'departmentData'
+          as: 'companyInfo'
         }
       },
       {
-        $unwind: '$departmentData'
+        // 解構關聯後的陣列
+        $unwind: {
+          path: '$companyInfo',
+          preserveNullAndEmptyArrays: true
+        }
       },
       {
+        // 按公司分組並計數
         $group: {
-          _id: '$departmentData.companyId',
-          count: { $sum: 1 }
+          _id: '$company',
+          count: { $sum: 1 },
+          companyName: { $first: '$companyInfo.name' }
         }
       }
     ])
@@ -630,7 +641,7 @@ export const getEmployeeStats = async (req, res) => {
       total: totalActive,
       companies: companyStats.map(stat => ({
         companyId: stat._id,
-        companyName: companyNames[stat._id],
+        companyName: stat.companyName || '未分類',
         count: stat.count
       }))
     }
@@ -640,6 +651,7 @@ export const getEmployeeStats = async (req, res) => {
       result: stats
     })
   } catch (error) {
+    console.error('Error getting employee stats:', error)
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: '獲取員工統計資料失敗',
@@ -702,8 +714,8 @@ export const remove = async (req, res) => {
           from: user.email,
           to: null
         },
-        department: {
-          from: user.department.name,
+        company: {
+          from: user.company.name,
           to: null
         },
         employmentStatus: {
@@ -800,54 +812,37 @@ export const edit = async (req, res) => {
   try {
     if (!validator.isMongoId(req.params.id)) throw new Error('ID')
 
-    // 先獲取原始用戶數據，並展開部門資訊
-    const originalUser = await User.findById(req.params.id).populate('department')
+    // 先獲取原始用戶數據，並展開公司資訊
+    const originalUser = await User.findById(req.params.id).populate('company')
     if (!originalUser) {
       throw new Error('NOT FOUND')
     }
 
     const updateData = { ...req.body }
     delete updateData.password
-    delete updateData.company
 
     // 創建一個只包含已更改欄位的物件
     const changedFields = {}
     const auditChanges = {}
 
-    // 處理部門相關的變更
-    if (updateData.department && updateData.department !== originalUser.department._id.toString()) {
-      // 獲取新的部門資料
-      const newDepartment = await Department.findById(updateData.department)
-      if (!newDepartment) {
-        return res.status(StatusCodes.BAD_REQUEST).json({ message: '找不到選定的部門' })
+    // 處理公司相關的變更
+    if (updateData.company && updateData.company !== originalUser.company.toString()) {
+      const newCompany = await Company.findById(updateData.company)
+      if (!newCompany) {
+        return res.status(StatusCodes.BAD_REQUEST).json({ message: '找不到選定的公司' })
       }
 
-      // 比較部門名稱是否真的有變更
-      if (newDepartment.name !== originalUser.department.name) {
-        changedFields.department = updateData.department
-        auditChanges.department = {
-          from: originalUser.department.name,
-          to: newDepartment.name
-        }
-      }
-
-      // 檢查並記錄公司變更
-      const originalCompanyName = companyNames[originalUser.department.companyId]
-      const newCompanyName = companyNames[newDepartment.companyId]
-
-      if (newDepartment.companyId !== originalUser.department.companyId) {
-        changedFields.companyId = newDepartment.companyId
-        auditChanges.company = {
-          from: originalCompanyName,
-          to: newCompanyName
-        }
+      changedFields.company = updateData.company
+      auditChanges.company = {
+        from: originalUser.company.name,
+        to: newCompany.name
       }
     }
 
     // 處理所有其他欄位的變更
     Object.keys(updateData).forEach(key => {
       // 跳過已處理的欄位
-      if (['department', 'companyId', 'company'].includes(key)) return
+      if (key === 'company') return
 
       // 處理日期類型
       if (key === 'birthDate' || key === 'hireDate' || key === 'resignationDate') {
@@ -883,7 +878,7 @@ export const edit = async (req, res) => {
         req.params.id,
         changedFields,
         { new: true, runValidators: true }
-      ).populate('department')
+      ).populate('company')
 
       // 記錄變更
       await AuditLog.create({
@@ -939,6 +934,10 @@ export const edit = async (req, res) => {
         message = '列印編號已註冊'
       } else if (error.keyValue.userId) {
         message = '員工編號已註冊'
+      } else if (error.keyValue.cowellAccount) {
+        message = '科威帳號已註冊'
+      } else if (error.keyValue.cowellPassword) {
+        message = '科威密碼已註冊'
       } else {
         message = '某些欄位值已註冊'
       }
@@ -1254,14 +1253,19 @@ export const sendInitialPassword = async (req, res) => {
           
           <div style="text-align: center; margin-top: 30px;">
             <p style="color: #666; margin-bottom: 20px;">Ysphere ERP System</p>
-            <img src="cid:logo" alt="YSTravel Logo" style="max-width: 150px; height: auto;">
+            <img src="cid:logo" alt="Ysphere LOGO" style="max-width: 150px; height: auto;">
           </div>
 
           <div style="text-align: center; margin-top: 20px; color: #999; font-size: 12px;">
             <p>此為系統自動發送的郵件，請勿直接回覆</p>
           </div>
         </div>
-      `
+      `,
+      attachments: [{
+        filename: 'logo.png',
+        path: path.join(__dirname, '../public/images/logo_horizontal.png'), // 請確保這個路徑指向你的 logo 圖片
+        cid: 'logo' // 這個 ID 需要和 HTML 中的 cid 匹配
+      }]
     }
 
     await transporter.sendMail(mailOptions)
@@ -1275,6 +1279,44 @@ export const sendInitialPassword = async (req, res) => {
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: '發送初始密碼失敗'
+    })
+  }
+}
+
+export const revealCowell = async (req, res) => {
+  try {
+    const { password } = req.body
+
+    // 驗證用戶輸入的密碼
+    const user = await User.findById(req.user._id)
+    if (!user) {
+      return res.status(StatusCodes.NOT_FOUND).json({
+        success: false,
+        message: '找不到用戶'
+      })
+    }
+
+    if (!bcrypt.compareSync(password, user.password)) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '密碼錯誤，無法查看科威帳號和密碼'
+      })
+    }
+
+    // 返回科威帳號和密碼
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '驗證成功',
+      result: {
+        cowellAccount: user.cowellAccount,
+        cowellPassword: user.cowellPassword
+      }
+    })
+  } catch (error) {
+    console.error('Reveal Cowell error:', error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '無法查看科威帳號和密碼'
     })
   }
 }

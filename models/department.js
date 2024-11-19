@@ -9,7 +9,7 @@ const departmentSchema = new Schema({
     type: String,
     unique: true
   },
-  companyId: { // 參考新的 Company 模型
+  c_id: {
     type: ObjectId,
     ref: 'companies',
     required: [true, '請選擇所屬公司']
@@ -19,6 +19,6 @@ const departmentSchema = new Schema({
   versionKey: false
 })
 
-departmentSchema.index({ name: 1, companyId: 1 }, { unique: true })
+departmentSchema.index({ name: 1, c_id: 1 }, { unique: true })
 
 export default model('departments', departmentSchema)

@@ -2,6 +2,7 @@ import Company from '../models/company.js'
 import AuditLog from '../models/auditLog.js'
 import { StatusCodes } from 'http-status-codes'
 import { getNextCompanyNumber } from '../utils/sequence.js' // 新增
+import Department from '../models/department.js'
 
 // 創建公司
 export const create = async (req, res) => {
@@ -71,7 +72,7 @@ export const getAll = async (req, res) => {
 // 編輯公司
 export const edit = async (req, res) => {
   try {
-    const { name } = req.body
+    const { name, companyId } = req.body
 
     const originalCompany = await Company.findById(req.params.id)
     if (!originalCompany) {
@@ -83,7 +84,7 @@ export const edit = async (req, res) => {
 
     const updatedCompany = await Company.findByIdAndUpdate(
       req.params.id,
-      { name },
+      { name, companyId },
       { new: true, runValidators: true }
     )
 
@@ -112,11 +113,24 @@ export const edit = async (req, res) => {
     })
   } catch (error) {
     console.error('Error editing company:', error)
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-      success: false,
-      message: '更新公司時發生錯誤',
-      error: error.message
-    })
+    if (error.code === 11000) {
+      let message = ''
+      if (error.keyValue.companyId) {
+        message = '公司編號已存在'
+      } else if (error.keyValue.name) {
+        message = '公司名稱已存在'
+      }
+      res.status(StatusCodes.CONFLICT).json({
+        success: false,
+        message
+      })
+    } else {
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: '更新公司時發生錯誤',
+        error: error.message
+      })
+    }
   }
 }
 
@@ -128,6 +142,15 @@ export const remove = async (req, res) => {
       return res.status(StatusCodes.NOT_FOUND).json({
         success: false,
         message: '找不到指定的公司'
+      })
+    }
+
+    // 修改這裡：使用 c_id 替代 companyId
+    const departmentCount = await Department.countDocuments({ c_id: company._id })
+    if (departmentCount > 0) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '該公司下還有部門,無法刪除'
       })
     }
 

@@ -4,14 +4,15 @@ import User from '../models/user.js'
 import AuditLog from '../models/auditLog.js'
 import { StatusCodes } from 'http-status-codes'
 import { getNextDepartmentNumber } from '../utils/sequence.js'
+import mongoose from 'mongoose'
 
 // 創建部門
 export const create = async (req, res) => {
   try {
-    const { name, companyId } = req.body
+    const { name, c_id } = req.body // 改用 c_id 而不是 companyId
 
     // 驗證公司是否存在
-    const company = await Company.findById(companyId)
+    const company = await Company.findById(c_id) // 這裡也改用 c_id
     if (!company) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
@@ -20,10 +21,14 @@ export const create = async (req, res) => {
     }
 
     // 獲取下一個部門編號
-    const departmentId = await getNextDepartmentNumber(companyId)
+    const departmentId = await getNextDepartmentNumber(c_id) // 這裡也改用 c_id
 
     // 創建部門
-    const department = await Department.create({ name, companyId, departmentId })
+    const department = await Department.create({
+      name,
+      c_id, // 直接使用 c_id
+      departmentId
+    })
 
     // 審計日誌
     await AuditLog.create({
@@ -36,7 +41,7 @@ export const create = async (req, res) => {
       changes: {
         name: { from: null, to: name },
         departmentId: { from: null, to: departmentId },
-        companyId: { from: null, to: companyId },
+        c_id: { from: null, to: c_id },
         companyName: { from: null, to: company.name }
       }
     })
@@ -58,32 +63,48 @@ export const create = async (req, res) => {
 }
 
 // 取得所有部門
+// 在 department controller 中
 export const getAll = async (req, res) => {
   try {
-    const { page = 1, itemsPerPage = 10, sortBy = 'companyId', sortOrder = 'asc', search, companyId } = req.query
+    const { companyId, search } = req.query
 
-    // 查詢條件
     const query = {}
-    if (search) query.name = new RegExp(search, 'i')
-    if (companyId) query.companyId = companyId
+    if (companyId) {
+      query.c_id = new mongoose.Types.ObjectId(companyId)
+    }
 
-    // 部門查詢
-    const total = await Department.countDocuments(query)
+    // 加入搜尋條件
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { departmentId: { $regex: search, $options: 'i' } }
+      ]
+    }
+
+    // 查詢部門並關聯公司資料
     const departments = await Department.find(query)
-      .populate('companyId', 'name')
-      .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 })
-      .skip((page - 1) * itemsPerPage)
-      .limit(Number(itemsPerPage))
+      .populate('c_id', 'name companyId')
+      .sort({ departmentId: 1 })
+      .lean()
+
+    // 獲取每個部門的在職員工數
+    const departmentsWithCounts = await Promise.all(
+      departments.map(async (dept) => {
+        const employeeCount = await User.countDocuments({
+          department: dept._id,
+          employmentStatus: '在職'
+        })
+        return {
+          ...dept,
+          employeeCount
+        }
+      })
+    )
 
     res.status(StatusCodes.OK).json({
       success: true,
       message: '取得部門列表成功',
-      result: {
-        data: departments,
-        totalItems: total,
-        currentPage: Number(page),
-        itemsPerPage: Number(itemsPerPage)
-      }
+      result: departmentsWithCounts
     })
   } catch (error) {
     console.error('取得部門列表錯誤:', error)
@@ -98,7 +119,7 @@ export const getAll = async (req, res) => {
 // 取得部門詳細資料
 export const getById = async (req, res) => {
   try {
-    const department = await Department.findById(req.params.id).populate('companyId', 'name')
+    const department = await Department.findById(req.params.id).populate('c_id', 'name')
     if (!department) {
       return res.status(StatusCodes.NOT_FOUND).json({
         success: false,
@@ -127,10 +148,11 @@ export const getById = async (req, res) => {
 }
 
 // 編輯部門
+// 修改 department controller 的 edit 方法
 export const edit = async (req, res) => {
   try {
-    const { name, companyId, departmentId } = req.body
-    const department = await Department.findById(req.params.id).populate('companyId', 'name')
+    const { name, c_id, departmentId } = req.body // 改用 c_id
+    const department = await Department.findById(req.params.id).populate('c_id', 'name')
 
     if (!department) {
       return res.status(StatusCodes.NOT_FOUND).json({
@@ -150,8 +172,9 @@ export const edit = async (req, res) => {
       }
     }
 
+    // 修改比較邏輯，使用 c_id 而不是 companyId
     if (name === department.name &&
-        companyId === department.companyId.toString() &&
+        c_id === department.c_id._id.toString() && // 修改這裡
         departmentId === department.departmentId) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
@@ -162,20 +185,24 @@ export const edit = async (req, res) => {
     const changes = {}
     if (name !== department.name) changes.name = { from: department.name, to: name }
     if (departmentId !== department.departmentId) changes.departmentId = { from: department.departmentId, to: departmentId }
-    if (companyId !== department.companyId.toString()) {
-      const newCompany = await Company.findById(companyId)
+    if (c_id !== department.c_id._id.toString()) { // 修改這裡
+      const newCompany = await Company.findById(c_id) // 使用 c_id
       if (!newCompany) {
         return res.status(StatusCodes.BAD_REQUEST).json({
           success: false,
           message: '新的公司不存在'
         })
       }
-      changes.companyId = { from: department.companyId._id, to: companyId }
-      changes.companyName = { from: department.companyId.name, to: newCompany.name }
+      changes.c_id = { from: department.c_id._id, to: c_id } // 修改這裡
+      changes.companyName = { from: department.c_id.name, to: newCompany.name }
     }
 
     // 更新部門資料
-    Object.assign(department, { name, companyId, departmentId })
+    Object.assign(department, {
+      name,
+      c_id, // 使用 c_id
+      departmentId
+    })
     await department.save()
 
     // 修正 AuditLog 創建
@@ -195,10 +222,12 @@ export const edit = async (req, res) => {
       changes
     })
 
+    const updatedDepartment = await Department.findById(department._id).populate('c_id', 'name')
+
     res.status(StatusCodes.OK).json({
       success: true,
       message: '部門更新成功',
-      result: department
+      result: updatedDepartment
     })
   } catch (error) {
     console.error('更新部門錯誤:', error)
@@ -234,7 +263,7 @@ export const remove = async (req, res) => {
     if (userCount > 0) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
-        message: '此部門還有在職員工，無法刪除'
+        message: '該部門下還有在職員工,無法刪除'
       })
     }
 

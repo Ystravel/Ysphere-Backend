@@ -15,7 +15,8 @@ import {
   updateAvatar,
   remove,
   getSuggestions,
-  sendInitialPassword
+  sendInitialPassword,
+  revealCowell
 } from '../controllers/user.js'
 import * as auth from '../middlewares/auth.js'
 import checkRole from '../middlewares/checkRole.js'
@@ -52,6 +53,9 @@ router.post('/:id/send-initial-password',
   checkRole([UserRole.HR, UserRole.SUPER_ADMIN]),
   sendInitialPassword
 )
+
+router.post('/reveal-cowell', auth.jwt, revealCowell)
+
 // 編輯用戶資料（僅限 ADMIN 和 SUPER_ADMIN）
 router.patch('/avatar', auth.jwt, upload, updateAvatar)
 

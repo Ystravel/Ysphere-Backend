@@ -108,6 +108,11 @@ const schema = new Schema({
     type: String,
     required: [true, '請輸入通訊地址']
   },
+  company: {
+    type: ObjectId,
+    ref: 'companies',
+    required: true
+  },
   department: {
     type: ObjectId,
     ref: 'departments',
