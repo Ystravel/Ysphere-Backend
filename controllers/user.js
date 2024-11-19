@@ -464,6 +464,30 @@ export const getAll = async (req, res) => {
     // 構建查詢條件
     const query = {}
 
+    if (req.query.hireDateStart && req.query.hireDateEnd) {
+      console.log('Hire Date Range:', req.query.hireDateStart, req.query.hireDateEnd)
+      query.hireDate = {
+        $gte: new Date(req.query.hireDateStart),
+        $lte: new Date(req.query.hireDateEnd)
+      }
+    }
+
+    if (req.query.resignationDateStart && req.query.resignationDateEnd) {
+      query.resignationDate = {
+        $gte: new Date(req.query.resignationDateStart),
+        $lte: new Date(req.query.resignationDateEnd)
+      }
+    }
+
+    if (req.query.birthDateStart && req.query.birthDateEnd) {
+      query.birthDate = {
+        $gte: new Date(req.query.birthDateStart),
+        $lte: new Date(req.query.birthDateEnd)
+      }
+    }
+
+    console.log('Query parameters:', req.query)
+
     // 這裡先處理與 OR 無關的查詢條件
     if (role !== undefined && role !== '') {
       query.role = Number(role)
@@ -1299,7 +1323,7 @@ export const revealCowell = async (req, res) => {
     if (!bcrypt.compareSync(password, user.password)) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
-        message: '密碼錯誤，無法查看科威帳號和密碼'
+        message: '密碼錯誤'
       })
     }
 

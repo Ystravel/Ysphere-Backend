@@ -75,9 +75,10 @@ export const getAll = async (req, res) => {
 
     // 加入搜尋條件
     if (search) {
+      // 使用 $text 搜索，需要在 schema 中設定 text index
       query.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { departmentId: { $regex: search, $options: 'i' } }
+        { name: new RegExp(search, 'i') }, // 使用 RegExp 對象
+        { departmentId: new RegExp(search, 'i') }
       ]
     }
 
