@@ -1289,7 +1289,7 @@ export const forgotPassword = async (req, res) => {
           
           <div style="text-align: center; margin-top: 30px;">
             <p>感謝您的使用！</p>
-            <p style="color: #666; margin-bottom: 20px;">Ysphere ERP System</p>
+            <p style="color: #666; margin-bottom: 20px;">Ysphere EIP System</p>
             <img src="cid:logo" alt="YSTravel Logo" style="max-width: 150px; height: auto;">
           </div>
 
@@ -1495,7 +1495,7 @@ export const sendInitialPassword = async (req, res) => {
           </div>
           
           <div style="text-align: center; margin-top: 30px;">
-            <p style="color: #666; margin-bottom: 20px;">Ysphere ERP System</p>
+            <p style="color: #666; margin-bottom: 20px;">Ysphere EIP System</p>
             <img src="cid:logo" alt="Ysphere LOGO" style="max-width: 150px; height: auto;">
           </div>
 

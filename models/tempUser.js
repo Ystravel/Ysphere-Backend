@@ -13,8 +13,17 @@ const tempUserSchema = new Schema({
   },
   personalEmail: {
     type: String,
+    sparse: true, // 允許資料庫中有空值,但如果有值的話還是要是唯一的
     unique: true,
-    validate: [validator.isEmail, '電子郵件格式不正確'],
+    validate: {
+      validator: function (value) {
+        // 如果是空值就通過檢查
+        // 如果有填寫才檢查是否符合 email 格式
+        if (value == null) return true
+        return validator.isEmail(value)
+      },
+      message: '電子郵件格式不正確'
+    },
     lowercase: true
   },
   IDNumber: {
