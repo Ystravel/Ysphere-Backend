@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import User from '../models/user.js'
 import Department from '../models/department.js'
 import ServiceTicket from '../models/serviceTicket.js'
@@ -63,16 +64,16 @@ export const getNextCompanyNumber = async () => {
  * 獲取下一個可用的部門編號
  * 編碼規則: 依公司編號 + 部門流水號 (01-99)
  * 例如: A101, A102 ... A199, B101 ...
- * @param {string} companyId - 公司編號
+ * @param {string} c_id - 公司的 MongoDB _id
  * @returns {Promise<string>} 格式化的部門編號
  */
-export const getNextDepartmentNumber = async (companyId) => {
+export const getNextDepartmentNumber = async (c_id) => {
   // 先查找公司資訊獲取公司編號
-  const company = await Company.findById(companyId)
+  const company = await Company.findById(c_id)
   if (!company) throw new Error('公司不存在')
 
   // 查找特定公司的所有部門編號
-  const departments = await Department.find({ companyId }, { departmentId: 1 })
+  const departments = await Department.find({ c_id }, { departmentId: 1 })
 
   // 提取部門流水號（最後兩位數字）
   const numbers = departments

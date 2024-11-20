@@ -247,11 +247,16 @@ export const login = async (req, res) => {
       })
     }
 
-    const token = jwt.sign({ _id: req.user._id }, process.env.JWT_SECRET, { expiresIn: '10h' })
-    req.user.tokens.push(token)
-    await req.user.save()
+    // 先 populate user 对象
+    const populatedUser = await User.findById(req.user._id)
+      .populate('company', 'name') // 现有的 populate
+      .populate('department', 'name departmentId') // 添加 department populate
 
-    if (req.user.isFirstLogin) {
+    const token = jwt.sign({ _id: populatedUser._id }, process.env.JWT_SECRET, { expiresIn: '10h' })
+    populatedUser.tokens.push(token)
+    await populatedUser.save()
+
+    if (populatedUser.isFirstLogin) {
       return res.status(StatusCodes.OK).json({
         success: true,
         message: '首次登入,請修改密碼',
@@ -266,27 +271,28 @@ export const login = async (req, res) => {
       message: '',
       result: {
         token,
-        name: req.user.name,
-        englishName: req.user.englishName,
-        birthDate: req.user.birthDate,
-        gender: req.user.gender,
-        cellphone: req.user.cellphone,
-        email: req.user.email,
-        permanentAddress: req.user.permanentAddress,
-        contactAddress: req.user.contactAddress,
-        emergencyName: req.user.emergencyName,
-        emergencyCellphone: req.user.emergencyCellphone,
-        userId: req.user.userId,
-        company: req.user.company,
-        hireDate: req.user.hireDate,
-        extNumber: req.user.extNumber,
-        printNumber: req.user.printNumber,
-        guideLicense: req.user.guideLicense,
-        role: req.user.role,
-        jobTitle: req.user.jobTitle,
-        avatar: req.user.avatar,
-        cowellAccount: req.user.cowellAccount,
-        cowellPassword: req.user.cowellPassword
+        name: populatedUser.name,
+        englishName: populatedUser.englishName,
+        birthDate: populatedUser.birthDate,
+        gender: populatedUser.gender,
+        cellphone: populatedUser.cellphone,
+        email: populatedUser.email,
+        permanentAddress: populatedUser.permanentAddress,
+        contactAddress: populatedUser.contactAddress,
+        emergencyName: populatedUser.emergencyName,
+        emergencyCellphone: populatedUser.emergencyCellphone,
+        userId: populatedUser.userId,
+        company: populatedUser.company,
+        department: populatedUser.department, // 现在会包含完整的部门信息
+        hireDate: populatedUser.hireDate,
+        extNumber: populatedUser.extNumber,
+        printNumber: populatedUser.printNumber,
+        guideLicense: populatedUser.guideLicense,
+        role: populatedUser.role,
+        jobTitle: populatedUser.jobTitle,
+        avatar: populatedUser.avatar,
+        cowellAccount: populatedUser.cowellAccount,
+        cowellPassword: populatedUser.cowellPassword
       }
     })
   } catch (error) {
@@ -317,11 +323,22 @@ export const googleLogin = async (req, res) => {
     const payload = ticket.getPayload()
     const email = payload.email
 
-    const user = await User.findOne({ email }).populate('company')
+    // 修改这里：同时 populate company 和 department
+    const user = await User.findOne({ email })
+      .populate('company', 'name')
+      .populate('department', 'name departmentId')
+
     if (!user) {
       return res.status(401).json({
         success: false,
         message: '此Email尚未註冊,請聯絡人資'
+      })
+    }
+
+    if (user.isFirstLogin) {
+      return res.status(StatusCodes.FORBIDDEN).json({
+        success: false,
+        message: '您是初次登入，請使用初始密碼登入'
       })
     }
 
@@ -356,6 +373,7 @@ export const googleLogin = async (req, res) => {
         emergencyCellphone: user.emergencyCellphone,
         userId: user.userId,
         company: user.company,
+        department: user.department, // 现在会包含完整的部门信息
         hireDate: user.hireDate,
         extNumber: user.extNumber,
         printNumber: user.printNumber,
@@ -444,138 +462,201 @@ export const profile = async (req, res) => {
   }
 }
 
+// // 新增一個日期處理的輔助函數
+// const getDateRange = (dateType, startDate, endDate) => {
+//   const start = new Date(startDate)
+//   const end = new Date(endDate)
+//   start.setHours(0, 0, 0, 0)
+//   end.setHours(23, 59, 59, 999)
+
+//   switch (dateType) {
+//     case 'hireDate':
+//       return {
+//         hireDate: {
+//           $gte: start,
+//           $lte: end
+//         }
+//       }
+//     case 'resignationDate':
+//       return {
+//         resignationDate: {
+//           $gte: start,
+//           $lte: end
+//         }
+//       }
+//     case 'birthDate':
+//       return {
+//         $and: [
+//           {
+//             birthDate: {
+//               $exists: true
+//             }
+//           },
+//           {
+//             $expr: {
+//               $or: [
+//                 // 考慮同年的情況
+//                 {
+//                   $and: [
+//                     { $eq: [{ $year: '$birthDate' }, start.getFullYear()] },
+//                     { $gte: [{ $dayOfYear: '$birthDate' }, { $dayOfYear: start }] },
+//                     { $lte: [{ $dayOfYear: '$birthDate' }, { $dayOfYear: end }] }
+//                   ]
+//                 },
+//                 // 考慮跨年的情況
+//                 {
+//                   $or: [
+//                     { $gte: [{ $dayOfYear: '$birthDate' }, { $dayOfYear: start }] },
+//                     { $lte: [{ $dayOfYear: '$birthDate' }, { $dayOfYear: end }] }
+//                   ]
+//                 }
+//               ]
+//             }
+//           }
+//         ]
+//       }
+//     default:
+//       return {}
+//   }
+// }
+
 // 取得所有用戶資料（包含分頁與排序）
 export const getAll = async (req, res) => {
   try {
     const itemsPerPage = req.query.itemsPerPage * 1 || 10
     const page = parseInt(req.query.page) || 1
-
-    const {
-      search,
-      quickSearch,
-      role,
-      companyId, // 使用 companyId
-      departmentId, // 使用 departmentId
-      gender,
-      guideLicense,
-      employmentStatus
-    } = req.query
-
-    // 構建查詢條件
     const query = {}
 
-    if (req.query.hireDateStart && req.query.hireDateEnd) {
-      console.log('Hire Date Range:', req.query.hireDateStart, req.query.hireDateEnd)
-      query.hireDate = {
-        $gte: new Date(req.query.hireDateStart),
-        $lte: new Date(req.query.hireDateEnd)
+    // 處理日期查詢
+    const { dateType } = req.query
+
+    if (dateType) {
+      let startDate, endDate
+
+      switch (dateType) {
+        case 'hireDate':
+          if (req.query.hireDateStart && req.query.hireDateEnd) {
+            startDate = new Date(req.query.hireDateStart)
+            endDate = new Date(req.query.hireDateEnd)
+            query.hireDate = {
+              $gte: startDate,
+              $lte: endDate
+            }
+          }
+          break
+
+        case 'resignationDate':
+          if (req.query.resignationDateStart && req.query.resignationDateEnd) {
+            startDate = new Date(req.query.resignationDateStart)
+            endDate = new Date(req.query.resignationDateEnd)
+            query.resignationDate = {
+              $gte: startDate,
+              $lte: endDate
+            }
+          }
+          break
+
+        case 'birthDate':
+          if (req.query.birthDateStart && req.query.birthDateEnd) {
+            startDate = new Date(req.query.birthDateStart)
+            endDate = new Date(req.query.birthDateEnd)
+
+            // 特殊處理生日查詢：只比較月份和日期
+            const startMonth = startDate.getMonth() + 1
+            const startDay = startDate.getDate()
+            const endMonth = endDate.getMonth() + 1
+            const endDay = endDate.getDate()
+
+            query.$expr = {
+              $let: {
+                vars: {
+                  birthMonth: { $month: '$birthDate' },
+                  birthDay: { $dayOfMonth: '$birthDate' }
+                },
+                in: {
+                  $or: [
+                    {
+                      $and: [
+                        { $eq: ['$$birthMonth', startMonth] },
+                        { $gte: ['$$birthDay', startDay] }
+                      ]
+                    },
+                    {
+                      $and: [
+                        { $gt: ['$$birthMonth', startMonth] },
+                        { $lt: ['$$birthMonth', endMonth] }
+                      ]
+                    },
+                    {
+                      $and: [
+                        { $eq: ['$$birthMonth', endMonth] },
+                        { $lte: ['$$birthDay', endDay] }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          }
+          break
       }
     }
 
-    if (req.query.resignationDateStart && req.query.resignationDateEnd) {
-      query.resignationDate = {
-        $gte: new Date(req.query.resignationDateStart),
-        $lte: new Date(req.query.resignationDateEnd)
-      }
+    // 處理其他查詢條件
+    if (req.query.role !== undefined && req.query.role !== '') {
+      query.role = Number(req.query.role)
     }
 
-    if (req.query.birthDateStart && req.query.birthDateEnd) {
-      query.birthDate = {
-        $gte: new Date(req.query.birthDateStart),
-        $lte: new Date(req.query.birthDateEnd)
-      }
+    if (req.query.companyId) {
+      query.company = new mongoose.Types.ObjectId(req.query.companyId)
     }
 
-    console.log('Query parameters:', req.query)
-
-    // 這裡先處理與 OR 無關的查詢條件
-    if (role !== undefined && role !== '') {
-      query.role = Number(role)
+    if (req.query.departmentId) {
+      query.department = new mongoose.Types.ObjectId(req.query.departmentId)
     }
 
-    if (companyId && companyId !== '') {
-      query.company = new mongoose.Types.ObjectId(companyId)
+    if (req.query.gender) {
+      query.gender = req.query.gender
     }
 
-    if (departmentId && departmentId !== '') {
-      query.department = new mongoose.Types.ObjectId(departmentId)
+    if (req.query.guideLicense !== undefined) {
+      query.guideLicense = req.query.guideLicense === 'true'
     }
 
-    if (gender !== undefined && gender !== '') {
-      query.gender = gender
+    if (req.query.employmentStatus) {
+      query.employmentStatus = req.query.employmentStatus
     }
 
-    if (guideLicense !== undefined && guideLicense !== '') {
-      query.guideLicense = guideLicense === 'true'
+    // 處理快速搜尋
+    if (req.query.quickSearch) {
+      const searchRegex = new RegExp(req.query.quickSearch, 'i')
+      query.$or = [
+        { name: searchRegex },
+        { userId: searchRegex },
+        { cellphone: searchRegex },
+        { extNumber: searchRegex },
+        { email: searchRegex },
+        { printNumber: searchRegex }
+      ]
     }
 
-    if (employmentStatus !== undefined && employmentStatus !== '') {
-      query.employmentStatus = employmentStatus
-    }
+    console.log('Final query:', JSON.stringify(query, null, 2))
 
-    // 處理搜尋條件
-    const searchConditions = []
-
-    if (search) {
-      searchConditions.push({
-        $or: [
-          { name: new RegExp(search, 'i') },
-          { englishName: new RegExp(search, 'i') },
-          { email: new RegExp(search, 'i') },
-          { userId: new RegExp(search, 'i') },
-          { cellphone: new RegExp(search, 'i') },
-          { extNumber: new RegExp(search, 'i') },
-          { printNumber: new RegExp(search, 'i') },
-          { jobTitle: new RegExp(search, 'i') },
-          { note: new RegExp(search, 'i') }
-        ]
-      })
-    }
-
-    if (quickSearch) {
-      searchConditions.push({
-        $or: [
-          { name: new RegExp(quickSearch, 'i') },
-          { userId: new RegExp(quickSearch, 'i') },
-          { cellphone: new RegExp(quickSearch, 'i') },
-          { extNumber: new RegExp(quickSearch, 'i') },
-          { email: new RegExp(quickSearch, 'i') },
-          { printNumber: new RegExp(quickSearch, 'i') }
-        ]
-      })
-    }
-
-    // 組合所有查詢條件
-    const finalQuery = { ...query }
-    if (searchConditions.length > 0) {
-      finalQuery.$and = searchConditions
-    }
-
-    // 計算總數
-    const total = await User.countDocuments(finalQuery)
-
-    // 構建排序條件
-    const sortBy = req.query.sortBy || 'userId'
-    const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1
-    const sort = { [sortBy]: sortOrder }
-
-    // 獲取資料並 populate 關聯
-    const result = await User.find(finalQuery)
+    const result = await User.find(query)
       .populate('company', 'name companyId')
       .populate('department', 'name departmentId')
-      .sort(sort)
+      .sort({ [req.query.sortBy || 'userId']: req.query.sortOrder === 'desc' ? -1 : 1 })
       .skip((page - 1) * itemsPerPage)
       .limit(itemsPerPage)
 
-    console.log('Query:', finalQuery) // 加入這行來檢查查詢條件
-    console.log('Result count:', result.length) // 加入這行來檢查結果數量
+    const total = await User.countDocuments(query)
 
     res.status(StatusCodes.OK).json({
       success: true,
       message: '',
       result: {
         data: result,
-        totalItems: total || 0,
+        totalItems: total,
         itemsPerPage,
         currentPage: page
       }
@@ -679,6 +760,137 @@ export const getEmployeeStats = async (req, res) => {
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: '獲取員工統計資料失敗',
+      error: error.message
+    })
+  }
+}
+
+export const searchByDateRange = async (req, res) => {
+  try {
+    const {
+      dateType,
+      startDate,
+      endDate,
+      page = 1,
+      itemsPerPage = 10,
+      sortBy = 'userId',
+      sortOrder = 'asc',
+      companyId,
+      departmentId,
+      employmentStatus
+    } = req.query
+
+    if (!dateType || !startDate || !endDate) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '缺少必要的日期參數'
+      })
+    }
+
+    const query = {}
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+
+    start.setHours(0, 0, 0, 0)
+    end.setHours(23, 59, 59, 999)
+
+    // 在 switch 外部先定義變量
+    let startMonth, startDay, endMonth, endDay
+
+    // 根據不同的日期類型設置查詢條件
+    switch (dateType) {
+      case 'hireDate': {
+        query.hireDate = { $gte: start, $lte: end }
+        break
+      }
+      case 'resignationDate': {
+        query.resignationDate = { $gte: start, $lte: end }
+        break
+      }
+      case 'birthDate': {
+        startMonth = start.getMonth() + 1
+        startDay = start.getDate()
+        endMonth = end.getMonth() + 1
+        endDay = end.getDate()
+
+        query.$expr = {
+          $let: {
+            vars: {
+              birthMonth: { $month: '$birthDate' },
+              birthDay: { $dayOfMonth: '$birthDate' }
+            },
+            in: {
+              $or: [
+                {
+                  $and: [
+                    { $eq: ['$$birthMonth', startMonth] },
+                    { $gte: ['$$birthDay', startDay] }
+                  ]
+                },
+                {
+                  $and: [
+                    { $gt: ['$$birthMonth', startMonth] },
+                    { $lt: ['$$birthMonth', endMonth] }
+                  ]
+                },
+                {
+                  $and: [
+                    { $eq: ['$$birthMonth', endMonth] },
+                    { $lte: ['$$birthDay', endDay] }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+        break
+      }
+      default: {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: '無效的日期類型'
+        })
+      }
+    }
+
+    // 添加其他篩選條件
+    if (companyId) {
+      query.company = new mongoose.Types.ObjectId(companyId)
+    }
+    if (departmentId) {
+      query.department = new mongoose.Types.ObjectId(departmentId)
+    }
+    if (employmentStatus) {
+      query.employmentStatus = employmentStatus
+    }
+
+    console.log('Date search query:', JSON.stringify(query, null, 2))
+
+    const [result, total] = await Promise.all([
+      User.find(query)
+        .populate('company', 'name companyId')
+        .populate('department', 'name departmentId')
+        .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 })
+        .skip((page - 1) * itemsPerPage)
+        .limit(itemsPerPage),
+      User.countDocuments(query)
+    ])
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '',
+      result: {
+        data: result,
+        totalItems: total,
+        itemsPerPage: Number(itemsPerPage),
+        currentPage: Number(page)
+      }
+    })
+  } catch (error) {
+    console.error('Date search error:', error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '日期搜尋失敗',
       error: error.message
     })
   }
@@ -836,75 +1048,84 @@ export const edit = async (req, res) => {
   try {
     if (!validator.isMongoId(req.params.id)) throw new Error('ID')
 
-    // 先獲取原始用戶數據，並展開公司資訊
-    const originalUser = await User.findById(req.params.id).populate('company')
+    // 先獲取原始用戶數據，並展開公司和部門資訊
+    const originalUser = await User.findById(req.params.id)
+      .populate('company', 'name')
+      .populate('department', 'name')
     if (!originalUser) {
       throw new Error('NOT FOUND')
     }
 
     const updateData = { ...req.body }
-    delete updateData.password
+    delete updateData.password // 禁止直接更新密碼
 
-    // 創建一個只包含已更改欄位的物件
-    const changedFields = {}
+    // 創建變更記錄物件
     const auditChanges = {}
 
-    // 處理公司相關的變更
-    if (updateData.company && updateData.company !== originalUser.company.toString()) {
-      const newCompany = await Company.findById(updateData.company)
-      if (!newCompany) {
-        return res.status(StatusCodes.BAD_REQUEST).json({ message: '找不到選定的公司' })
-      }
+    // 處理所有欄位的變更
+    const updateFields = [
+      'name',
+      'email',
+      'gender',
+      'IDNumber',
+      'salary',
+      'englishName',
+      'permanentAddress',
+      'contactAddress',
+      'emergencyName',
+      'emergencyCellphone',
+      'emergencyRelationship',
+      'hireDate',
+      'birthDate',
+      'extNumber',
+      'printNumber',
+      'guideLicense',
+      'cowellAccount',
+      'cowellPassword',
+      'employmentStatus',
+      'jobTitle',
+      'cellphone',
+      'role'
+    ]
 
-      changedFields.company = updateData.company
-      auditChanges.company = {
-        from: originalUser.company.name,
-        to: newCompany.name
-      }
-    }
+    // 比較原始數據和更新數據，記錄變更
+    updateFields.forEach(field => {
+      const originalValue = originalUser[field] || null
+      const updatedValue = updateData[field] || null
 
-    // 處理所有其他欄位的變更
-    Object.keys(updateData).forEach(key => {
-      // 跳過已處理的欄位
-      if (key === 'company') return
-
-      // 處理日期類型
-      if (key === 'birthDate' || key === 'hireDate' || key === 'resignationDate') {
-        const originalDate = originalUser[key] ? originalUser[key].toISOString() : null
-        const newDate = updateData[key] ? new Date(updateData[key]).toISOString() : null
-        if (originalDate !== newDate) {
-          changedFields[key] = updateData[key]
-          auditChanges[key] = {
-            from: originalDate,
-            to: newDate
-          }
-        }
-      } else if (key === 'role' && originalUser[key]?.toString() !== updateData[key]?.toString()) {
-        // 處理角色欄位
-        changedFields[key] = updateData[key]
-        auditChanges[key] = {
-          from: roleNames[originalUser[key]] || `未知角色(${originalUser[key]})`,
-          to: roleNames[updateData[key]] || `未知角色(${updateData[key]})`
-        }
-      } else if (originalUser[key]?.toString() !== updateData[key]?.toString()) {
-        // 處理其他欄位
-        changedFields[key] = updateData[key]
-        auditChanges[key] = {
-          from: originalUser[key],
-          to: updateData[key]
-        }
+      if (originalValue?.toString() !== updatedValue?.toString()) {
+        auditChanges[field] = { from: originalValue, to: updatedValue }
       }
     })
 
-    // 如果有欄位被更改才更新數據
-    if (Object.keys(changedFields).length > 0) {
-      const user = await User.findByIdAndUpdate(
-        req.params.id,
-        changedFields,
-        { new: true, runValidators: true }
-      ).populate('company')
+    // 處理公司和部門的變更（需要查詢名稱）
+    if (updateData.company && updateData.company !== originalUser.company?._id.toString()) {
+      const newCompany = await Company.findById(updateData.company)
+      auditChanges.company = {
+        from: originalUser.company?.name || null,
+        to: newCompany?.name || null
+      }
+    }
 
-      // 記錄變更
+    if (updateData.department && updateData.department !== originalUser.department?._id.toString()) {
+      const newDepartment = await Department.findById(updateData.department)
+      auditChanges.department = {
+        from: originalUser.department?.name || null,
+        to: newDepartment?.name || null
+      }
+    }
+
+    // 如果有欄位被更改才更新數據
+    if (Object.keys(auditChanges).length > 0) {
+      const updatedUser = await User.findByIdAndUpdate(
+        req.params.id,
+        updateData,
+        { new: true, runValidators: true }
+      )
+        .populate('company', 'name')
+        .populate('department', 'name')
+
+      // 記錄變更到 AuditLog
       await AuditLog.create({
         operatorId: req.user._id,
         operatorInfo: {
@@ -912,10 +1133,10 @@ export const edit = async (req, res) => {
           userId: req.user.userId
         },
         action: '修改',
-        targetId: user._id,
+        targetId: updatedUser._id,
         targetInfo: {
-          name: user.name,
-          userId: user.userId
+          name: updatedUser.name,
+          userId: updatedUser.userId
         },
         targetModel: 'users',
         changes: auditChanges
@@ -924,7 +1145,7 @@ export const edit = async (req, res) => {
       res.status(StatusCodes.OK).json({
         success: true,
         message: '用戶資料更新成功',
-        result: user
+        result: updatedUser
       })
     } else {
       res.status(StatusCodes.OK).json({
@@ -960,8 +1181,6 @@ export const edit = async (req, res) => {
         message = '員工編號已註冊'
       } else if (error.keyValue.cowellAccount) {
         message = '科威帳號已註冊'
-      } else if (error.keyValue.cowellPassword) {
-        message = '科威密碼已註冊'
       } else {
         message = '某些欄位值已註冊'
       }

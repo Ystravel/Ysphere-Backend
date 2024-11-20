@@ -1,3 +1,4 @@
+/* eslint-disable camelcase */
 import Department from '../models/department.js'
 import Company from '../models/company.js'
 import User from '../models/user.js'
@@ -41,7 +42,6 @@ export const create = async (req, res) => {
       changes: {
         name: { from: null, to: name },
         departmentId: { from: null, to: departmentId },
-        c_id: { from: null, to: c_id },
         companyName: { from: null, to: company.name }
       }
     })
@@ -66,53 +66,139 @@ export const create = async (req, res) => {
 // 在 department controller 中
 export const getAll = async (req, res) => {
   try {
-    const { companyId, search } = req.query
+    // 1. 解析請求參數
+    const {
+      page = 1,
+      itemsPerPage = 10,
+      sortBy = 'departmentId',
+      sortOrder = 'asc',
+      companyId,
+      search
+    } = req.query
 
+    // 2. 驗證並轉換參數
+    const pageNum = Math.max(1, parseInt(page))
+    const limit = Math.max(1, parseInt(itemsPerPage))
+    const skip = (pageNum - 1) * limit
+
+    // 3. 構建查詢條件
     const query = {}
+
+    // 處理公司篩選
     if (companyId) {
+      if (!mongoose.Types.ObjectId.isValid(companyId)) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: '無效的公司 ID'
+        })
+      }
       query.c_id = new mongoose.Types.ObjectId(companyId)
     }
 
-    // 加入搜尋條件
+    // 處理搜尋條件
     if (search) {
-      // 使用 $text 搜索，需要在 schema 中設定 text index
       query.$or = [
-        { name: new RegExp(search, 'i') }, // 使用 RegExp 對象
-        { departmentId: new RegExp(search, 'i') }
+        { name: new RegExp(search.trim(), 'i') },
+        { departmentId: new RegExp(search.trim(), 'i') }
       ]
     }
 
-    // 查詢部門並關聯公司資料
-    const departments = await Department.find(query)
-      .populate('c_id', 'name companyId')
-      .sort({ departmentId: 1 })
-      .lean()
+    // 4. 構建排序條件
+    const sortOptions = {}
+    // 驗證排序欄位是否合法
+    const validSortFields = ['departmentId', 'name', 'c_id.name']
+    if (validSortFields.includes(sortBy)) {
+      sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1
+    } else {
+      sortOptions.departmentId = 1 // 默認排序
+    }
 
-    // 獲取每個部門的在職員工數
-    const departmentsWithCounts = await Promise.all(
-      departments.map(async (dept) => {
-        const employeeCount = await User.countDocuments({
-          department: dept._id,
-          employmentStatus: '在職'
+    // 5. 執行查詢
+    try {
+      // 同時執行查詢和計數
+      const [departments, total] = await Promise.all([
+        Department.find(query)
+          .populate('c_id', 'name companyId')
+          .sort(sortOptions)
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+        Department.countDocuments(query)
+      ])
+
+      // 6. 獲取每個部門的員工統計
+      const departmentsWithStats = await Promise.all(
+        departments.map(async (dept) => {
+          try {
+            // 獲取在職員工數
+            const [activeCount, totalCount] = await Promise.all([
+              User.countDocuments({
+                department: dept._id,
+                employmentStatus: '在職'
+              }),
+              User.countDocuments({
+                department: dept._id
+              })
+            ])
+
+            return {
+              ...dept,
+              employeeCount: activeCount,
+              totalEmployeeCount: totalCount
+            }
+          } catch (error) {
+            console.error(`Error getting employee counts for department ${dept._id}:`, error)
+            return {
+              ...dept,
+              employeeCount: 0,
+              totalEmployeeCount: 0
+            }
+          }
         })
-        return {
-          ...dept,
-          employeeCount
+      )
+
+      // 7. 計算分頁資訊
+      const totalPages = Math.ceil(total / limit)
+      const hasNextPage = pageNum < totalPages
+      const hasPrevPage = pageNum > 1
+
+      // 8. 返回成功響應
+      return res.status(StatusCodes.OK).json({
+        success: true,
+        message: '取得部門列表成功',
+        result: {
+          data: departmentsWithStats,
+          pagination: {
+            totalItems: total,
+            totalPages,
+            currentPage: pageNum,
+            itemsPerPage: limit,
+            hasNextPage,
+            hasPrevPage
+          },
+          summary: {
+            totalDepartments: total,
+            filteredDepartments: departments.length,
+            activeFilter: !!companyId || !!search
+          }
         }
       })
-    )
-
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: '取得部門列表成功',
-      result: departmentsWithCounts
-    })
+    } catch (error) {
+      console.error('Database query error:', error)
+      throw new Error('數據庫查詢錯誤')
+    }
   } catch (error) {
-    console.error('取得部門列表錯誤:', error)
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+    // 9. 錯誤處理
+    console.error('Get departments error:', error)
+    const errorMessage = error.message || '取得部門列表時發生錯誤'
+    const statusCode = error.message === '無效的公司 ID'
+      ? StatusCodes.BAD_REQUEST
+      : StatusCodes.INTERNAL_SERVER_ERROR
+
+    return res.status(statusCode).json({
       success: false,
-      message: '取得部門列表時發生錯誤',
-      error: error.message
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
     })
   }
 }
@@ -223,7 +309,9 @@ export const edit = async (req, res) => {
       changes
     })
 
-    const updatedDepartment = await Department.findById(department._id).populate('c_id', 'name')
+    const updatedDepartment = await Department.findById(department._id)
+      .populate('c_id', 'name companyId')
+      .lean()
 
     res.status(StatusCodes.OK).json({
       success: true,

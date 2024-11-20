@@ -17,6 +17,13 @@ export const login = (req, res, next) => {
           message: '未知錯誤'
         })
         return
+      } else if (info.message === '密碼錯誤' && user && user.isFirstLogin) {
+        // 修改這裡：當密碼錯誤且是首次登入時，返回首次登入的提示
+        res.status(StatusCodes.FORBIDDEN).json({
+          success: false,
+          message: '您是初次登入，請使用初始密碼登入'
+        })
+        return
       } else {
         res.status(StatusCodes.BAD_REQUEST).json({
           success: false,

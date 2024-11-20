@@ -18,7 +18,6 @@ export const getAll = async (req, res) => {
     } = req.query
 
     const pipeline = [
-      // 關聯操作者
       {
         $lookup: {
           from: 'users',
@@ -32,42 +31,43 @@ export const getAll = async (req, res) => {
           operator: { $arrayElemAt: ['$operator', 0] }
         }
       },
-      // 處理操作對象查詢 - 分開處理不同模型
       {
-        $facet: {
-          users: [
-            { $match: { targetModel: 'users' } },
-            {
-              $lookup: {
-                from: 'users',
-                localField: 'targetId',
-                foreignField: '_id',
-                as: 'targetData'
-              }
-            }
-          ],
-          departments: [
-            { $match: { targetModel: 'departments' } },
-            {
-              $lookup: {
-                from: 'departments',
-                localField: 'targetId',
-                foreignField: '_id',
-                as: 'targetData'
-              }
-            }
-          ]
+        $lookup: {
+          from: 'departments',
+          localField: 'changes.department.from',
+          foreignField: '_id',
+          as: 'fromDepartment'
         }
       },
       {
-        $project: {
-          all: {
-            $concatArrays: ['$users', '$departments']
+        $lookup: {
+          from: 'departments',
+          localField: 'changes.department.to',
+          foreignField: '_id',
+          as: 'toDepartment'
+        }
+      },
+      {
+        $addFields: {
+          'changes.department.from': {
+            $cond: [
+              { $or: [{ $eq: [{ $type: '$changes.department.from' }, 'string'] }, { $eq: ['$changes.department.from', null] }] },
+              '$changes.department.from',
+              { $arrayElemAt: ['$fromDepartment.name', 0] }
+            ]
+          },
+          'changes.department.to': {
+            $cond: [
+              { $or: [{ $eq: [{ $type: '$changes.department.to' }, 'string'] }, { $eq: ['$changes.department.to', null] }] },
+              '$changes.department.to',
+              { $arrayElemAt: ['$toDepartment.name', 0] }
+            ]
           }
         }
       },
-      { $unwind: '$all' },
-      { $replaceRoot: { newRoot: '$all' } }
+      {
+        $unset: ['fromDepartment', 'toDepartment']
+      }
     ]
 
     // 構建匹配條件
