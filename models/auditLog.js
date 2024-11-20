@@ -9,7 +9,7 @@ const auditLogSchema = new Schema({
   },
   action: {
     type: String,
-    enum: ['創建', '修改', '刪除'],
+    enum: ['創建', '修改', '刪除', '轉為正式'],
     required: true
   },
   targetId: {

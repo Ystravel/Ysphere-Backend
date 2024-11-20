@@ -13,29 +13,31 @@ const tempUserSchema = new Schema({
   },
   personalEmail: {
     type: String,
-    sparse: true, // 允許資料庫中有空值,但如果有值的話還是要是唯一的
-    unique: true,
-    validate: {
-      validator: function (value) {
-        // 如果是空值就通過檢查
-        // 如果有填寫才檢查是否符合 email 格式
-        if (value == null) return true
-        return validator.isEmail(value)
-      },
-      message: '電子郵件格式不正確'
-    },
-    lowercase: true
+    lowercase: true,
+    validate: [validator.isEmail, '個人Email格式不正確']
   },
   IDNumber: {
     type: String,
-    uppercase: true
+    uppercase: true,
+    validate: {
+      validator: function (v) {
+        return /^[A-Z][12]\d{8}$/.test(v)
+      },
+      message: '身分證號碼格式不正確'
+    }
   },
   gender: {
     type: String,
     enum: ['男性', '女性']
   },
   cellphone: {
-    type: String
+    type: String,
+    validate: {
+      validator: function (v) {
+        return /^09\d{8}$/.test(v)
+      },
+      message: '手機號碼格式不正確'
+    }
   },
   birthDate: {
     type: Date
@@ -59,38 +61,40 @@ const tempUserSchema = new Schema({
   },
 
   // 工作相關
-  plannedCompany: {
+  company: {
     type: ObjectId,
     ref: 'companies'
   },
-  plannedDepartment: {
+  department: {
     type: ObjectId,
     ref: 'departments'
   },
-  plannedJobTitle: {
+  jobTitle: {
     type: String
   },
-  plannedSalary: {
+  salary: {
     type: String
   },
-  plannedExtNumber: {
+  extNumber: {
     type: String
   },
-  effectiveDate: { // 任何生效日 例如: 預計面試日期、預計報到日期、預計離職日期、預計留職停薪日期、預計退休日期
+  effectiveDate: {
     type: Date
   },
-
-  // 狀態
   status: {
     type: String,
-    enum: ['待面試', '待入職', '待離職', '待留停', '待退休', '待處理', '已處理', '已取消'],
-    default: '待入職'
+    enum: ['待面試', '待入職', '已完成', '已取消'],
+    default: '待面試'
   },
-  seatDescription: { // 座位描述
+  seatDescription: {
     type: String
   },
-  note: { // 備註
+  note: {
     type: String
+  },
+  isTransferred: {
+    type: Boolean,
+    default: false
   },
 
   // 追蹤欄位
@@ -108,4 +112,11 @@ const tempUserSchema = new Schema({
   versionKey: false
 })
 
-export default model('tempUser', tempUserSchema)
+// 索引
+tempUserSchema.index({
+  status: 1,
+  company: 1,
+  department: 1
+})
+
+export default model('tempUsers', tempUserSchema)

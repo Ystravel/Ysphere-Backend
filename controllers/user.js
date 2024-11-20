@@ -1223,6 +1223,14 @@ export const forgotPassword = async (req, res) => {
       })
     }
 
+    // 加入初次登入判斷
+    if (user.isFirstLogin) {
+      return res.status(StatusCodes.FORBIDDEN).json({
+        success: false,
+        message: '您是初次登入用戶，請使用初始密碼登入系統'
+      })
+    }
+
     // 檢查用戶狀態
     if (user.employmentStatus !== '在職') {
       return res.status(StatusCodes.FORBIDDEN).json({
