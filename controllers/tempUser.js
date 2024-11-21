@@ -62,8 +62,24 @@ export const getAll = async (req, res) => {
     if (req.query.companyId) {
       query.company = new mongoose.Types.ObjectId(req.query.companyId)
     }
-    if (req.query.departmentId) {
-      query.department = new mongoose.Types.ObjectId(req.query.departmentId)
+    if (req.query.department) {
+      query.department = new mongoose.Types.ObjectId(req.query.department)
+    }
+
+    // 處理日期搜索
+    if (req.query.effectiveStartDate && req.query.effectiveEndDate) {
+      const startDate = new Date(req.query.effectiveStartDate)
+      const endDate = new Date(req.query.effectiveEndDate)
+
+      // 如果開始日期和結束日期相同，將結束日期設為當天的最後一毫秒
+      if (startDate.toDateString() === endDate.toDateString()) {
+        endDate.setHours(23, 59, 59, 999)
+      }
+
+      query.effectiveDate = {
+        $gte: startDate,
+        $lte: endDate
+      }
     }
 
     // 處理快速搜尋
@@ -76,23 +92,63 @@ export const getAll = async (req, res) => {
       ]
     }
 
-    const result = await TempUser.find(query)
-      .populate('company', 'name')
-      .populate('department', 'name')
-      .populate('createdBy', 'name userId')
-      .populate('lastModifiedBy', 'name userId')
-      .sort({ [req.query.sortBy || 'createdAt']: req.query.sortOrder === 'desc' ? -1 : 1 })
-      .skip((page - 1) * itemsPerPage)
-      .limit(itemsPerPage)
+    const sortField = req.query.sortBy || 'createdAt'
+    const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1
 
-    const total = await TempUser.countDocuments(query)
+    const pipeline = [
+      { $match: query },
+      {
+        $lookup: {
+          from: 'companies',
+          localField: 'company',
+          foreignField: '_id',
+          as: 'company'
+        }
+      },
+      { $unwind: { path: '$company', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'department',
+          foreignField: '_id',
+          as: 'department'
+        }
+      },
+      { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'createdBy',
+          foreignField: '_id',
+          as: 'createdBy'
+        }
+      },
+      { $unwind: { path: '$createdBy', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'lastModifiedBy',
+          foreignField: '_id',
+          as: 'lastModifiedBy'
+        }
+      },
+      { $unwind: { path: '$lastModifiedBy', preserveNullAndEmptyArrays: true } },
+      { $sort: { [sortField]: sortOrder } },
+      { $skip: (page - 1) * itemsPerPage },
+      { $limit: itemsPerPage }
+    ]
+
+    const [result, totalCount] = await Promise.all([
+      TempUser.aggregate(pipeline),
+      TempUser.countDocuments(query)
+    ])
 
     res.status(StatusCodes.OK).json({
       success: true,
       message: '',
       result: {
         data: result,
-        totalItems: total,
+        totalItems: totalCount,
         itemsPerPage,
         currentPage: page
       }

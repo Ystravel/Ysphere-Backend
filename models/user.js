@@ -58,6 +58,11 @@ const schema = new Schema({
     validate: [validator.isEmail, '使用者電子郵件格式不正確'],
     lowercase: true
   },
+  personalEmail: {
+    type: String,
+    validate: [validator.isEmail, '個人電子郵件格式不正確'],
+    lowercase: true
+  },
   password: {
     type: String,
     required: [true, '請輸入使用者密碼']

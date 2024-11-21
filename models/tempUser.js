@@ -14,27 +14,38 @@ const tempUserSchema = new Schema({
   personalEmail: {
     type: String,
     lowercase: true,
-    validate: [validator.isEmail, '個人Email格式不正確']
+    validate: {
+      validator: function (v) {
+        // 允許空值，但如果有值就必須符合 email 格式
+        return !v || validator.isEmail(v)
+      },
+      message: '個人Email格式不正確'
+    }
   },
   IDNumber: {
     type: String,
     uppercase: true,
     validate: {
       validator: function (v) {
-        return /^[A-Z][12]\d{8}$/.test(v)
+        // 允許空值，但如果有值就必須符合身分證格式
+        return !v || /^[A-Z][12]\d{8}$/.test(v)
       },
       message: '身分證號碼格式不正確'
     }
   },
   gender: {
     type: String,
-    enum: ['男性', '女性']
+    enum: {
+      values: ['男性', '女性', ''], // 允許空值
+      message: '性別格式不正確'
+    }
   },
   cellphone: {
     type: String,
     validate: {
       validator: function (v) {
-        return /^09\d{8}$/.test(v)
+        // 允許空值，但如果有值就必須符合手機格式
+        return !v || /^09\d{8}$/.test(v)
       },
       message: '手機號碼格式不正確'
     }
@@ -110,13 +121,6 @@ const tempUserSchema = new Schema({
 }, {
   timestamps: true,
   versionKey: false
-})
-
-// 索引
-tempUserSchema.index({
-  status: 1,
-  company: 1,
-  department: 1
 })
 
 export default model('tempUsers', tempUserSchema)

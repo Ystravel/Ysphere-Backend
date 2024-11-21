@@ -66,6 +66,10 @@ export const create = async (req, res) => {
         from: null,
         to: result.email
       },
+      personalEmail: {
+        from: null,
+        to: result.personalEmail
+      },
       gender: {
         from: null,
         to: result.gender
@@ -277,6 +281,7 @@ export const login = async (req, res) => {
         gender: populatedUser.gender,
         cellphone: populatedUser.cellphone,
         email: populatedUser.email,
+        personalEmail: populatedUser.personalEmail,
         permanentAddress: populatedUser.permanentAddress,
         contactAddress: populatedUser.contactAddress,
         emergencyName: populatedUser.emergencyName,
@@ -331,14 +336,14 @@ export const googleLogin = async (req, res) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: '此Email尚未註冊,請聯絡人資'
+        message: '此Email尚未註冊,請聯絡人資部門'
       })
     }
 
     if (user.isFirstLogin) {
       return res.status(StatusCodes.FORBIDDEN).json({
         success: false,
-        message: '您是初次登入，請使用初始密碼登入'
+        message: '您是初次登入用戶，請使用初始密碼登入系統'
       })
     }
 
@@ -367,6 +372,7 @@ export const googleLogin = async (req, res) => {
         gender: user.gender,
         cellphone: user.cellphone,
         email: user.email,
+        personalEmail: user.personalEmail,
         permanentAddress: user.permanentAddress,
         contactAddress: user.contactAddress,
         emergencyName: user.emergencyName,
@@ -432,6 +438,7 @@ export const profile = async (req, res) => {
       message: '',
       result: {
         email: user.email,
+        personalEmail: user.personalEmail,
         IDNumber: user.IDNumber,
         gender: user.gender,
         name: user.name,
@@ -527,82 +534,48 @@ export const getAll = async (req, res) => {
     const page = parseInt(req.query.page) || 1
     const query = {}
 
-    // 處理日期查詢
-    const { dateType } = req.query
+    // // 保留原有的生日查詢邏輯，因為它與 search 函式中的處理不同
+    // if (req.query.dateType === 'birthDate' && req.query.birthDateStart && req.query.birthDateEnd) {
+    //   const startDate = new Date(req.query.birthDateStart)
+    //   const endDate = new Date(req.query.birthDateEnd)
+    //   const startMonth = startDate.getMonth() + 1
+    //   const startDay = startDate.getDate()
+    //   const endMonth = endDate.getMonth() + 1
+    //   const endDay = endDate.getDate()
 
-    if (dateType) {
-      let startDate, endDate
+    //   query.$expr = {
+    //     $let: {
+    //       vars: {
+    //         birthMonth: { $month: '$birthDate' },
+    //         birthDay: { $dayOfMonth: '$birthDate' }
+    //       },
+    //       in: {
+    //         $or: [
+    //           {
+    //             $and: [
+    //               { $eq: ['$$birthMonth', startMonth] },
+    //               { $gte: ['$$birthDay', startDay] }
+    //             ]
+    //           },
+    //           {
+    //             $and: [
+    //               { $gt: ['$$birthMonth', startMonth] },
+    //               { $lt: ['$$birthMonth', endMonth] }
+    //             ]
+    //           },
+    //           {
+    //             $and: [
+    //               { $eq: ['$$birthMonth', endMonth] },
+    //               { $lte: ['$$birthDay', endDay] }
+    //             ]
+    //           }
+    //         ]
+    //       }
+    //     }
+    //   }
+    // }
 
-      switch (dateType) {
-        case 'hireDate':
-          if (req.query.hireDateStart && req.query.hireDateEnd) {
-            startDate = new Date(req.query.hireDateStart)
-            endDate = new Date(req.query.hireDateEnd)
-            query.hireDate = {
-              $gte: startDate,
-              $lte: endDate
-            }
-          }
-          break
-
-        case 'resignationDate':
-          if (req.query.resignationDateStart && req.query.resignationDateEnd) {
-            startDate = new Date(req.query.resignationDateStart)
-            endDate = new Date(req.query.resignationDateEnd)
-            query.resignationDate = {
-              $gte: startDate,
-              $lte: endDate
-            }
-          }
-          break
-
-        case 'birthDate':
-          if (req.query.birthDateStart && req.query.birthDateEnd) {
-            startDate = new Date(req.query.birthDateStart)
-            endDate = new Date(req.query.birthDateEnd)
-
-            // 特殊處理生日查詢：只比較月份和日期
-            const startMonth = startDate.getMonth() + 1
-            const startDay = startDate.getDate()
-            const endMonth = endDate.getMonth() + 1
-            const endDay = endDate.getDate()
-
-            query.$expr = {
-              $let: {
-                vars: {
-                  birthMonth: { $month: '$birthDate' },
-                  birthDay: { $dayOfMonth: '$birthDate' }
-                },
-                in: {
-                  $or: [
-                    {
-                      $and: [
-                        { $eq: ['$$birthMonth', startMonth] },
-                        { $gte: ['$$birthDay', startDay] }
-                      ]
-                    },
-                    {
-                      $and: [
-                        { $gt: ['$$birthMonth', startMonth] },
-                        { $lt: ['$$birthMonth', endMonth] }
-                      ]
-                    },
-                    {
-                      $and: [
-                        { $eq: ['$$birthMonth', endMonth] },
-                        { $lte: ['$$birthDay', endDay] }
-                      ]
-                    }
-                  ]
-                }
-              }
-            }
-          }
-          break
-      }
-    }
-
-    // 處理其他查詢條件
+    // 處理其他查詢條件，保持原有邏輯
     if (req.query.role !== undefined && req.query.role !== '') {
       query.role = Number(req.query.role)
     }
@@ -625,19 +598,6 @@ export const getAll = async (req, res) => {
 
     if (req.query.employmentStatus) {
       query.employmentStatus = req.query.employmentStatus
-    }
-
-    // 處理快速搜尋
-    if (req.query.quickSearch) {
-      const searchRegex = new RegExp(req.query.quickSearch, 'i')
-      query.$or = [
-        { name: searchRegex },
-        { userId: searchRegex },
-        { cellphone: searchRegex },
-        { extNumber: searchRegex },
-        { email: searchRegex },
-        { printNumber: searchRegex }
-      ]
     }
 
     console.log('Final query:', JSON.stringify(query, null, 2))
@@ -670,7 +630,6 @@ export const getAll = async (req, res) => {
     })
   }
 }
-
 export const getSuggestions = async (req, res) => {
   try {
     const search = req.query.search || ''
@@ -1066,6 +1025,7 @@ export const edit = async (req, res) => {
     const updateFields = [
       'name',
       'email',
+      'personalEmail',
       'gender',
       'IDNumber',
       'salary',
@@ -1568,6 +1528,117 @@ export const revealCowell = async (req, res) => {
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: '無法查看科威帳號和密碼'
+    })
+  }
+}
+
+export const search = async (req, res) => {
+  try {
+    const itemsPerPage = req.query.itemsPerPage * 1 || 10
+    const page = parseInt(req.query.page) || 1
+    const query = {}
+
+    // 處理日期查詢
+    if (req.query.dateType && req.query.startDate && req.query.endDate) {
+      const startDate = new Date(req.query.startDate)
+      const endDate = new Date(req.query.endDate)
+
+      // 如果開始日期和結束日期相同，將結束日期設為當天的最後一毫秒
+      if (startDate.toDateString() === endDate.toDateString()) {
+        endDate.setHours(23, 59, 59, 999)
+      }
+
+      if (req.query.dateType === 'hireDate') {
+        query.hireDate = { $gte: startDate, $lte: endDate }
+      } else if (req.query.dateType === 'resignationDate') {
+        query.resignationDate = { $gte: startDate, $lte: endDate }
+      }
+    }
+
+    // 處理其他查詢條件
+    if (req.query.role) {
+      query.role = Number(req.query.role)
+    }
+    if (req.query.companyId) {
+      query.company = new mongoose.Types.ObjectId(req.query.companyId)
+    }
+    if (req.query.department) {
+      query.department = new mongoose.Types.ObjectId(req.query.department)
+    }
+    if (req.query.gender) {
+      query.gender = req.query.gender
+    }
+    if (req.query.guideLicense !== undefined) {
+      query.guideLicense = req.query.guideLicense === 'true'
+    }
+    if (req.query.employmentStatus) {
+      query.employmentStatus = req.query.employmentStatus
+    }
+
+    // 處理快速搜尋
+    if (req.query.quickSearch) {
+      const searchRegex = new RegExp(req.query.quickSearch, 'i')
+      query.$or = [
+        { name: searchRegex },
+        { userId: searchRegex },
+        { email: searchRegex },
+        { cellphone: searchRegex },
+        { extNumber: searchRegex },
+        { personalEmail: searchRegex }
+      ]
+    }
+
+    console.log('Final query:', JSON.stringify(query, null, 2))
+
+    const sortField = req.query.sortBy || 'userId'
+    const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1
+
+    const pipeline = [
+      { $match: query },
+      {
+        $lookup: {
+          from: 'companies',
+          localField: 'company',
+          foreignField: '_id',
+          as: 'company'
+        }
+      },
+      { $unwind: { path: '$company', preserveNullAndEmptyArrays: true } },
+      {
+        $lookup: {
+          from: 'departments',
+          localField: 'department',
+          foreignField: '_id',
+          as: 'department'
+        }
+      },
+      { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
+      { $sort: { [sortField]: sortOrder } },
+      { $skip: (page - 1) * itemsPerPage },
+      { $limit: itemsPerPage }
+    ]
+
+    const [result, totalCount] = await Promise.all([
+      User.aggregate(pipeline),
+      User.countDocuments(query)
+    ])
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '',
+      result: {
+        data: result,
+        totalItems: totalCount,
+        itemsPerPage,
+        currentPage: page
+      }
+    })
+  } catch (error) {
+    console.error('Search users error:', error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '搜索用户时发生错误',
+      error: error.message
     })
   }
 }
