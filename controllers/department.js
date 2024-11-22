@@ -4,16 +4,15 @@ import Company from '../models/company.js'
 import User from '../models/user.js'
 import AuditLog from '../models/auditLog.js'
 import { StatusCodes } from 'http-status-codes'
-import { getNextDepartmentNumber } from '../utils/sequence.js'
 import mongoose from 'mongoose'
 
 // 創建部門
 export const create = async (req, res) => {
   try {
-    const { name, c_id } = req.body // 改用 c_id 而不是 companyId
+    const { name, c_id, departmentId } = req.body
 
     // 驗證公司是否存在
-    const company = await Company.findById(c_id) // 這裡也改用 c_id
+    const company = await Company.findById(c_id)
     if (!company) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
@@ -21,13 +20,27 @@ export const create = async (req, res) => {
       })
     }
 
-    // 獲取下一個部門編號
-    const departmentId = await getNextDepartmentNumber(c_id) // 這裡也改用 c_id
+    // 檢查部門ID格式
+    if (!departmentId.startsWith(company.companyId)) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '部門代碼格式錯誤，必須包含公司編號'
+      })
+    }
+
+    // 檢查部門ID是否已存在
+    const existingDepartment = await Department.findOne({ departmentId })
+    if (existingDepartment) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message: '該部門代碼已存在'
+      })
+    }
 
     // 創建部門
     const department = await Department.create({
       name,
-      c_id, // 直接使用 c_id
+      c_id,
       departmentId
     })
 
@@ -53,7 +66,7 @@ export const create = async (req, res) => {
     })
   } catch (error) {
     console.error('Error creating department:', error)
-    const errorMessage = error.code === 11000 ? '該公司已有相同名稱的部門，請更改部門名稱' : '創建部門時發生錯誤'
+    const errorMessage = error.code === 11000 ? '該部門代碼已存在' : '創建部門時發生錯誤'
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: errorMessage,
@@ -238,8 +251,8 @@ export const getById = async (req, res) => {
 // 修改 department controller 的 edit 方法
 export const edit = async (req, res) => {
   try {
-    const { name, c_id, departmentId } = req.body // 改用 c_id
-    const department = await Department.findById(req.params.id).populate('c_id', 'name')
+    const { name, c_id, departmentId } = req.body
+    const department = await Department.findById(req.params.id).populate('c_id', 'name companyId')
 
     if (!department) {
       return res.status(StatusCodes.NOT_FOUND).json({
@@ -248,64 +261,68 @@ export const edit = async (req, res) => {
       })
     }
 
-    if (departmentId) {
-      // 檢查部門編號是否已存在
-      const existingDepartment = await Department.findOne({ departmentId })
-      if (existingDepartment && existingDepartment._id.toString() !== department._id.toString()) {
-        return res.status(StatusCodes.BAD_REQUEST).json({
-          success: false,
-          message: '部門編號已存在，請使用其他編號'
-        })
-      }
-    }
-
-    // 修改比較邏輯，使用 c_id 而不是 companyId
-    if (name === department.name &&
-        c_id === department.c_id._id.toString() && // 修改這裡
-        departmentId === department.departmentId) {
-      return res.status(StatusCodes.BAD_REQUEST).json({
-        success: false,
-        message: '未進行任何修改'
-      })
-    }
-
-    const changes = {}
-    if (name !== department.name) changes.name = { from: department.name, to: name }
-    if (departmentId !== department.departmentId) changes.departmentId = { from: department.departmentId, to: departmentId }
-    if (c_id !== department.c_id._id.toString()) { // 修改這裡
-      const newCompany = await Company.findById(c_id) // 使用 c_id
+    // 如果要更改公司
+    if (c_id !== department.c_id._id.toString()) {
+      const newCompany = await Company.findById(c_id)
       if (!newCompany) {
         return res.status(StatusCodes.BAD_REQUEST).json({
           success: false,
           message: '新的公司不存在'
         })
       }
-      changes.c_id = { from: department.c_id._id, to: c_id } // 修改這裡
+
+      // 確認新的部門ID是否包含新公司的編號
+      if (!departmentId.startsWith(newCompany.companyId)) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: '部門代碼格式錯誤，必須包含正確的公司編號'
+        })
+      }
+    } else {
+      // 如果沒有更改公司，確認部門ID是否包含當前公司編號
+      if (!departmentId.startsWith(department.c_id.companyId)) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: '部門代碼格式錯誤，必須包含公司編號'
+        })
+      }
+    }
+
+    // 檢查新的部門ID是否與其他部門重複
+    if (departmentId !== department.departmentId) {
+      const existingDepartment = await Department.findOne({ departmentId })
+      if (existingDepartment && existingDepartment._id.toString() !== department._id.toString()) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: '該部門代碼已存在'
+        })
+      }
+    }
+
+    const changes = {}
+    if (name !== department.name) changes.name = { from: department.name, to: name }
+    if (departmentId !== department.departmentId) changes.departmentId = { from: department.departmentId, to: departmentId }
+    if (c_id !== department.c_id._id.toString()) {
+      const newCompany = await Company.findById(c_id)
       changes.companyName = { from: department.c_id.name, to: newCompany.name }
     }
 
     // 更新部門資料
     Object.assign(department, {
       name,
-      c_id, // 使用 c_id
+      c_id,
       departmentId
     })
     await department.save()
 
-    // 修正 AuditLog 創建
+    // 審計日誌
     await AuditLog.create({
       operatorId: req.user._id,
-      operatorInfo: {
-        name: req.user.name,
-        userId: req.user.userId
-      },
+      operatorInfo: { name: req.user.name, userId: req.user.userId },
       action: '修改',
       targetId: department._id,
+      targetInfo: { name: department.name, departmentId: department.departmentId },
       targetModel: 'departments',
-      targetInfo: {
-        name: department.name,
-        departmentId: department.departmentId
-      },
       changes
     })
 
@@ -320,13 +337,10 @@ export const edit = async (req, res) => {
     })
   } catch (error) {
     console.error('更新部門錯誤:', error)
-    const errorMessage = error.code === 11000
-      ? '該公司已有相同名稱的部門，請更改部門名稱'
-      : '更新部門時發生錯誤'
-    return res.status(StatusCodes.BAD_REQUEST).json({
+    const errorMessage = error.code === 11000 ? '該部門代碼已存在' : '更新部門時發生錯誤'
+    res.status(StatusCodes.BAD_REQUEST).json({
       success: false,
-      message: errorMessage,
-      field: error.code === 11000 ? 'name' : undefined
+      message: errorMessage
     })
   }
 }

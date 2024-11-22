@@ -31,42 +31,62 @@ export const getAll = async (req, res) => {
           operator: { $arrayElemAt: ['$operator', 0] }
         }
       },
+      // 根據 targetModel 動態查詢對應的集合
       {
         $lookup: {
-          from: 'departments',
-          localField: 'changes.department.from',
+          from: 'users',
+          localField: 'targetId',
           foreignField: '_id',
-          as: 'fromDepartment'
+          as: 'userTarget'
         }
       },
       {
         $lookup: {
           from: 'departments',
-          localField: 'changes.department.to',
+          localField: 'targetId',
           foreignField: '_id',
-          as: 'toDepartment'
+          as: 'departmentTarget'
         }
       },
+      {
+        $lookup: {
+          from: 'tempusers', // 新增 tempUsers 的 lookup
+          localField: 'targetId',
+          foreignField: '_id',
+          as: 'tempUserTarget'
+        }
+      },
+      // 根據 targetModel 選擇正確的 target 資料
       {
         $addFields: {
-          'changes.department.from': {
-            $cond: [
-              { $or: [{ $eq: [{ $type: '$changes.department.from' }, 'string'] }, { $eq: ['$changes.department.from', null] }] },
-              '$changes.department.from',
-              { $arrayElemAt: ['$fromDepartment.name', 0] }
-            ]
-          },
-          'changes.department.to': {
-            $cond: [
-              { $or: [{ $eq: [{ $type: '$changes.department.to' }, 'string'] }, { $eq: ['$changes.department.to', null] }] },
-              '$changes.department.to',
-              { $arrayElemAt: ['$toDepartment.name', 0] }
-            ]
+          targetData: {
+            $switch: {
+              branches: [
+                {
+                  case: { $eq: ['$targetModel', 'users'] },
+                  then: { $arrayElemAt: ['$userTarget', 0] }
+                },
+                {
+                  case: { $eq: ['$targetModel', 'departments'] },
+                  then: { $arrayElemAt: ['$departmentTarget', 0] }
+                },
+                {
+                  case: { $eq: ['$targetModel', 'tempUsers'] },
+                  then: { $arrayElemAt: ['$tempUserTarget', 0] }
+                }
+              ],
+              default: null
+            }
           }
         }
       },
+      // 清理中間結果
       {
-        $unset: ['fromDepartment', 'toDepartment']
+        $project: {
+          userTarget: 0,
+          departmentTarget: 0,
+          tempUserTarget: 0
+        }
       }
     ]
 
@@ -80,17 +100,10 @@ export const getAll = async (req, res) => {
           operatorId: new mongoose.Types.ObjectId(operatorId)
         })
       } else {
-        // 如果不是有效的 ObjectId,則根據 userId 查詢
         matchConditions.push({
           $or: [
             { 'operator.userId': operatorId },
-            // 如果關聯查詢為空,才使用 operatorInfo
-            {
-              $and: [
-                { operator: null },
-                { 'operatorInfo.userId': operatorId }
-              ]
-            }
+            { 'operatorInfo.userId': operatorId }
           ]
         })
       }
@@ -108,25 +121,19 @@ export const getAll = async (req, res) => {
         if (!targetModel || targetModel === 'users') {
           searchConditions.push(
             { 'targetData.userId': targetId },
-            // 如果關聯查詢為空,才使用 targetInfo
-            {
-              $and: [
-                { targetData: null },
-                { 'targetInfo.userId': targetId }
-              ]
-            }
+            { 'targetInfo.userId': targetId }
           )
         }
         if (!targetModel || targetModel === 'departments') {
           searchConditions.push(
             { 'targetData.departmentId': targetId },
-            // 如果關聯查詢為空,才使用 targetInfo
-            {
-              $and: [
-                { targetData: null },
-                { 'targetInfo.departmentId': targetId }
-              ]
-            }
+            { 'targetInfo.departmentId': targetId }
+          )
+        }
+        if (!targetModel || targetModel === 'tempUsers') { // 新增 tempUsers 的搜尋條件
+          searchConditions.push(
+            { 'targetData.name': new RegExp(targetId, 'i') },
+            { 'targetInfo.name': new RegExp(targetId, 'i') }
           )
         }
 
@@ -177,32 +184,6 @@ export const getAll = async (req, res) => {
       { $skip: (page - 1) * itemsPerPage },
       { $limit: itemsPerPage }
     )
-
-    // 最終投影 - 優先使用關聯數據
-    pipeline.push({
-      $project: {
-        createdAt: 1,
-        action: 1,
-        targetModel: 1,
-        changes: 1,
-        operatorInfo: 1,
-        targetInfo: 1,
-        operator: {
-          $cond: {
-            if: { $ne: ['$operator', null] },
-            then: '$operator',
-            else: '$operatorInfo'
-          }
-        },
-        targetData: {
-          $cond: {
-            if: { $ne: [{ $arrayElemAt: ['$targetData', 0] }, null] },
-            then: { $arrayElemAt: ['$targetData', 0] },
-            else: '$targetInfo'
-          }
-        }
-      }
-    })
 
     const data = await AuditLog.aggregate(pipeline)
 

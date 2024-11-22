@@ -1,6 +1,5 @@
 /* eslint-disable camelcase */
 import User from '../models/user.js'
-import Department from '../models/department.js'
 import ServiceTicket from '../models/serviceTicket.js'
 import Company from '../models/company.js'
 
@@ -8,22 +7,49 @@ import Company from '../models/company.js'
  * 獲取下一個可用的員工編號
  * @returns {Promise<string>} 格式化的員工編號 (例如: '0014')
  */
-export const getNextUserNumber = async () => {
-  // 查找所有用戶的 userId，並提取數字部分
-  const users = await User.find({}, { userId: 1 })
-  const numbers = users
-    .map(user => parseInt(user.userId))
-    .filter(num => !isNaN(num)) // 過濾掉無效的數字
+/**
+ * 獲取下一個可用的員工編號
+ * @param {string} departmentId - 部門ID (例如: 'A1IT', 'A1FM')
+ * @returns {Promise<string>} 格式化的員工編號 (例如: 'A1IT001', 'A1FM001')
+ */
+export const getNextUserNumber = async (departmentId) => {
+  // 查找該部門下所有用戶的 userId
+  const users = await User.aggregate([
+    {
+      $lookup: {
+        from: 'departments',
+        localField: 'department',
+        foreignField: '_id',
+        as: 'departmentInfo'
+      }
+    },
+    {
+      $unwind: '$departmentInfo'
+    },
+    {
+      $match: {
+        'departmentInfo.departmentId': departmentId
+      }
+    }
+  ])
 
-  // 如果沒有現有用戶，從 1 開始
-  if (numbers.length === 0) {
-    return '0001'
+  if (users.length === 0) {
+    // 該部門第一位員工
+    return `${departmentId}001`
   }
 
-  // 找到最大的數字
+  // 提取現有員工編號的序號部分並找出最大值
+  const numbers = users
+    .map(user => {
+      const match = user.userId.match(/\d+$/)
+      return match ? parseInt(match[0]) : 0
+    })
+    .filter(num => !isNaN(num))
+
   const maxNumber = Math.max(...numbers)
-  // 返回下一個數字
-  return String(maxNumber + 1).padStart(4, '0')
+
+  // 返回下一個序號
+  return `${departmentId}${String(maxNumber + 1).padStart(3, '0')}`
 }
 
 /**
@@ -58,45 +84,6 @@ export const getNextCompanyNumber = async () => {
     }
     return `${nextLetter}1`
   }
-}
-
-/**
- * 獲取下一個可用的部門編號
- * 編碼規則: 依公司編號 + 部門流水號 (01-99)
- * 例如: A101, A102 ... A199, B101 ...
- * @param {string} c_id - 公司的 MongoDB _id
- * @returns {Promise<string>} 格式化的部門編號
- */
-export const getNextDepartmentNumber = async (c_id) => {
-  // 先查找公司資訊獲取公司編號
-  const company = await Company.findById(c_id)
-  if (!company) throw new Error('公司不存在')
-
-  // 查找特定公司的所有部門編號
-  const departments = await Department.find({ c_id }, { departmentId: 1 })
-
-  // 提取部門流水號（最後兩位數字）
-  const numbers = departments
-    .map((dept) => {
-      const match = dept.departmentId?.match(/\d{2}$/)
-      return match ? parseInt(match[0]) : 0
-    })
-    .filter((num) => !isNaN(num))
-
-  // 如果沒有部門，從 01 開始
-  if (numbers.length === 0) {
-    return `${company.companyId}01`
-  }
-
-  // 找到最大的流水號
-  const maxNumber = Math.max(...numbers)
-
-  if (maxNumber >= 99) {
-    throw new Error(`公司 ${company.companyId} 的部門數量已達最大限制`)
-  }
-
-  // 返回下一個流水號，格式為 "公司編號 + 兩位數流水號"
-  return `${company.companyId}${String(maxNumber + 1).padStart(2, '0')}`
 }
 
 /**

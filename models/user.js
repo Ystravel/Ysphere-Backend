@@ -60,7 +60,6 @@ const schema = new Schema({
   },
   personalEmail: {
     type: String,
-    validate: [validator.isEmail, '個人電子郵件格式不正確'],
     lowercase: true
   },
   password: {
@@ -93,8 +92,7 @@ const schema = new Schema({
     unique: true
   },
   salary: {
-    type: String,
-    required: [true, '請輸入基本薪資']
+    type: String
   },
   extNumber: {
     type: String,

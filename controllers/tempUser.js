@@ -3,16 +3,181 @@ import { StatusCodes } from 'http-status-codes'
 import mongoose from 'mongoose'
 import validator from 'validator'
 import AuditLog from '../models/auditLog.js'
+import Company from '../models/company.js'
+import Department from '../models/department.js'
 
 // 建立臨時員工資料
 export const create = async (req, res) => {
   try {
+    // 從請求中提取公司和部門 ID
+    const { company, department } = req.body
+
+    let companyData, departmentData
+
+    // 如果提供了公司 ID,則查詢完整的公司資料
+    if (company) {
+      companyData = await Company.findById(company)
+      if (!companyData) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: '找不到選定的公司'
+        })
+      }
+    }
+
+    // 如果提供了部門 ID,則查詢完整的部門資料
+    if (department) {
+      departmentData = await Department.findById(department)
+      if (!departmentData) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          success: false,
+          message: '找不到選定的部門'
+        })
+      }
+    }
+
+    // 創建招聘資料
     const result = await TempUser.create({
       ...req.body,
-      createdBy: req.user._id
+      company,
+      department,
+      createdBy: req.user._id // 添加 createdBy 欄位,設置為當前用戶的 ID
     })
 
-    // 記錄操作日誌
+    // 更完整的變更記錄
+    const changes = {}
+
+    // 必填欄位一定會有值,直接記錄
+    changes.name = {
+      from: null,
+      to: result.name
+    }
+    changes.status = {
+      from: null,
+      to: result.status
+    }
+    changes.effectiveDate = {
+      from: null,
+      to: result.effectiveDate
+    }
+
+    // 其他選填欄位,只在有值時才記錄
+    if (result.englishName) {
+      changes.englishName = {
+        from: null,
+        to: result.englishName
+      }
+    }
+    if (result.personalEmail) {
+      changes.personalEmail = {
+        from: null,
+        to: result.personalEmail
+      }
+    }
+    if (result.IDNumber) {
+      changes.IDNumber = {
+        from: null,
+        to: result.IDNumber
+      }
+    }
+    if (result.gender) {
+      changes.gender = {
+        from: null,
+        to: result.gender
+      }
+    }
+    if (result.cellphone) {
+      changes.cellphone = {
+        from: null,
+        to: result.cellphone
+      }
+    }
+    if (result.birthDate) {
+      changes.birthDate = {
+        from: null,
+        to: result.birthDate
+      }
+    }
+    if (result.permanentAddress) {
+      changes.permanentAddress = {
+        from: null,
+        to: result.permanentAddress
+      }
+    }
+    if (result.contactAddress) {
+      changes.contactAddress = {
+        from: null,
+        to: result.contactAddress
+      }
+    }
+    if (result.emergencyName) {
+      changes.emergencyName = {
+        from: null,
+        to: result.emergencyName
+      }
+    }
+    if (result.emergencyCellphone) {
+      changes.emergencyCellphone = {
+        from: null,
+        to: result.emergencyCellphone
+      }
+    }
+    if (result.emergencyRelationship) {
+      changes.emergencyRelationship = {
+        from: null,
+        to: result.emergencyRelationship
+      }
+    }
+    if (companyData?.name) {
+      changes.company = {
+        from: null,
+        to: companyData.name
+      }
+    }
+    if (departmentData?.name) {
+      changes.department = {
+        from: null,
+        to: departmentData.name
+      }
+    }
+    if (result.jobTitle) {
+      changes.jobTitle = {
+        from: null,
+        to: result.jobTitle
+      }
+    }
+    if (result.salary) {
+      changes.salary = {
+        from: null,
+        to: result.salary
+      }
+    }
+    if (result.extNumber) {
+      changes.extNumber = {
+        from: null,
+        to: result.extNumber
+      }
+    }
+    if (result.seatDescription) {
+      changes.seatDescription = {
+        from: null,
+        to: result.seatDescription
+      }
+    }
+    if (result.note) {
+      changes.note = {
+        from: null,
+        to: result.note
+      }
+    }
+    if (result.isTransferred !== undefined) {
+      changes.isTransferred = {
+        from: null,
+        to: result.isTransferred
+      }
+    }
+
+    // 記錄異動
     await AuditLog.create({
       operatorId: req.user._id,
       operatorInfo: {
@@ -22,32 +187,36 @@ export const create = async (req, res) => {
       action: '創建',
       targetId: result._id,
       targetInfo: {
-        name: result.name
+        name: result.name,
+        departmentId: departmentData?.departmentId,
+        companyId: companyData?.companyId
       },
       targetModel: 'tempUsers',
-      changes: {
-        name: {
-          from: null,
-          to: result.name
-        },
-        status: {
-          from: null,
-          to: result.status
-        }
-      }
+      changes
     })
 
     res.status(StatusCodes.OK).json({
       success: true,
-      message: '臨時員工資料建立成功',
+      message: '招聘資料創建成功',
       result
     })
   } catch (error) {
     console.error('Create temp user error:', error)
-    handleError(res, error)
+    if (error.name === 'ValidationError') {
+      const key = Object.keys(error.errors)[0]
+      const message = error.errors[key].message
+      res.status(StatusCodes.BAD_REQUEST).json({
+        success: false,
+        message
+      })
+    } else {
+      res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+        success: false,
+        message: '未知錯誤'
+      })
+    }
   }
 }
-
 // 取得所有臨時員工資料
 export const getAll = async (req, res) => {
   try {
@@ -164,42 +333,88 @@ export const edit = async (req, res) => {
   try {
     if (!validator.isMongoId(req.params.id)) throw new Error('ID')
 
-    const tempUser = await TempUser.findById(req.params.id)
-      .populate('company', 'name')
-      .populate('department', 'name')
+    // 先獲取原始資料,並展開公司和部門資訊
+    const originalTempUser = await TempUser.findById(req.params.id)
+      .populate('company', 'name companyId')
+      .populate('department', 'name departmentId')
 
-    if (!tempUser) {
+    if (!originalTempUser) {
       throw new Error('NOT FOUND')
     }
 
-    if (tempUser.isTransferred) {
-      return res.status(StatusCodes.FORBIDDEN).json({
-        success: false,
-        message: '此臨時員工資料已轉為正式員工，無法修改'
-      })
-    }
+    const updateData = { ...req.body }
 
-    const updateData = { ...req.body, lastModifiedBy: req.user._id }
+    // 創建變更記錄物件
+    const auditChanges = {}
 
-    // 建立變更記錄
-    const changes = {}
-    for (const [key, value] of Object.entries(updateData)) {
-      if (tempUser[key]?.toString() !== value?.toString()) {
-        changes[key] = {
-          from: tempUser[key],
-          to: value
+    // 處理所有欄位的變更
+    const updateFields = [
+      'name',
+      'englishName',
+      'personalEmail',
+      'IDNumber',
+      'gender',
+      'cellphone',
+      'birthDate',
+      'permanentAddress',
+      'contactAddress',
+      'emergencyName',
+      'emergencyCellphone',
+      'emergencyRelationship',
+      'jobTitle',
+      'salary',
+      'extNumber',
+      'effectiveDate',
+      'status',
+      'seatDescription',
+      'note',
+      'isTransferred',
+      'associatedUserId'
+    ]
+
+    // 比較原始數據和更新數據,記錄變更
+    updateFields.forEach(field => {
+      if (Object.prototype.hasOwnProperty.call(updateData, field)) {
+        const originalValue = originalTempUser[field]
+        const updatedValue = updateData[field]
+
+        if (originalValue?.toString() !== updatedValue?.toString()) {
+          auditChanges[field] = {
+            from: originalValue || null,
+            to: updatedValue || null
+          }
         }
+      }
+    })
+
+    // 處理公司和部門的變更
+    if (updateData.company && updateData.company !== originalTempUser.company?._id.toString()) {
+      const newCompany = await Company.findById(updateData.company)
+      auditChanges.company = {
+        from: originalTempUser.company?.name || null,
+        to: newCompany?.name || null
       }
     }
 
-    const result = await TempUser.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true }
-    ).populate('company department')
+    if (updateData.department && updateData.department !== originalTempUser.department?._id.toString()) {
+      const newDepartment = await Department.findById(updateData.department)
+      auditChanges.department = {
+        from: originalTempUser.department?.name || null,
+        to: newDepartment?.name || null
+      }
+    }
 
-    // 記錄變更
-    if (Object.keys(changes).length > 0) {
+    // 如果有欄位被更改才更新數據
+    if (Object.keys(auditChanges).length > 0) {
+      const updatedTempUser = await TempUser.findByIdAndUpdate(
+        req.params.id,
+        updateData,
+        { new: true, runValidators: true }
+      )
+        .populate('company', 'name companyId')
+        .populate('department', 'name departmentId')
+
+      // 記錄變更到 AuditLog
       await AuditLog.create({
         operatorId: req.user._id,
         operatorInfo: {
@@ -207,20 +422,28 @@ export const edit = async (req, res) => {
           userId: req.user.userId
         },
         action: '修改',
-        targetId: result._id,
+        targetId: updatedTempUser._id,
         targetInfo: {
-          name: result.name
+          name: updatedTempUser.name,
+          departmentId: updatedTempUser.department?.departmentId,
+          companyId: updatedTempUser.company?.companyId
         },
         targetModel: 'tempUsers',
-        changes
+        changes: auditChanges
+      })
+
+      res.status(StatusCodes.OK).json({
+        success: true,
+        message: '招聘資料更新成功',
+        result: updatedTempUser
+      })
+    } else {
+      res.status(StatusCodes.OK).json({
+        success: true,
+        message: '沒有欄位被修改',
+        result: originalTempUser
       })
     }
-
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: '臨時員工資料更新成功',
-      result
-    })
   } catch (error) {
     console.error('Edit temp user error:', error)
     handleError(res, error)
@@ -376,6 +599,7 @@ export const getFormattedForTransfer = async (req, res) => {
     const formattedData = {
       name: tempUser.name,
       englishName: tempUser.englishName,
+      personalEmail: tempUser.personalEmail,
       gender: tempUser.gender,
       IDNumber: tempUser.IDNumber,
       cellphone: tempUser.cellphone,
@@ -390,6 +614,7 @@ export const getFormattedForTransfer = async (req, res) => {
       jobTitle: tempUser.jobTitle,
       salary: tempUser.salary,
       extNumber: tempUser.extNumber,
+      note: tempUser.note,
       hireDate: tempUser.effectiveDate // 生效日期轉為入職日期
     }
 
@@ -404,7 +629,7 @@ export const getFormattedForTransfer = async (req, res) => {
 
 export const updateAfterTransfer = async (req, res) => {
   try {
-    const { tempUserId, userId } = req.params // userId 是新建立的正式員工 ID
+    const { tempUserId, userId } = req.params
 
     const result = await TempUser.findByIdAndUpdate(
       tempUserId,

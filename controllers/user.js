@@ -26,19 +26,25 @@ const transporter = nodemailer.createTransport({
 
 export const create = async (req, res) => {
   try {
-    const userId = await getNextUserNumber()
-
-    // 從請求中提取公司 ID
-    const { company, department } = req.body
-    const companyData = await Company.findById(company)
-    const departmentData = await Department.findById(department)
-
-    if (!companyData) {
-      return res.status(StatusCodes.BAD_REQUEST).json({ message: '找不到選定的公司' })
+    // 先查詢部門資訊
+    const departmentData = await Department.findById(req.body.department)
+    if (!departmentData) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        message: '找不到選定的部門'
+      })
     }
 
-    if (!departmentData) {
-      return res.status(StatusCodes.BAD_REQUEST).json({ message: '找不到選定的部門' })
+    // 使用部門編號生成員工編號
+    const userId = await getNextUserNumber(departmentData.departmentId)
+
+    // 從請求中提取公司 ID 和其他資訊
+    const { company, department } = req.body
+    const companyData = await Company.findById(company)
+
+    if (!companyData) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        message: '找不到選定的公司'
+      })
     }
 
     const randomPassword = crypto.randomBytes(8).toString('hex')
