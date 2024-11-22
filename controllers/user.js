@@ -1029,6 +1029,7 @@ export const edit = async (req, res) => {
 
     // 處理所有欄位的變更
     const updateFields = [
+      'userId',
       'name',
       'email',
       'personalEmail',
