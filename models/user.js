@@ -1,70 +1,86 @@
 import { Schema, model, Error, ObjectId } from 'mongoose'
-import validator from 'validator'
 import bcrypt from 'bcrypt'
 import UserRole from '../enums/UserRole.js'
 
-const todoSchema = new Schema({
-  userId: {
-    type: ObjectId,
-    ref: 'users',
-    required: true
-  },
-  title: {
+// const todoSchema = new Schema({
+//   userId: {
+//     type: ObjectId,
+//     ref: 'users',
+//     required: true
+//   },
+//   title: {
+//     type: String,
+//     required: [true, '請輸入待辦事項標題']
+//   },
+//   description: {
+//     type: String
+//   },
+//   dueDate: {
+//     type: Date
+//   },
+//   priority: {
+//     type: String,
+//     enum: ['低', '中', '高'],
+//     default: '中'
+//   },
+//   status: {
+//     type: String,
+//     enum: ['待處理', '進行中', '已完成'],
+//     default: '待處理'
+//   },
+//   reminder: {
+//     enabled: { // 是否啟用提醒
+//       type: Boolean,
+//       default: false
+//     },
+//     time: Date, // 提醒時間
+//     isNotified: { // 是否已發送通知
+//       type: Boolean,
+//       default: false
+//     },
+//     repeatType: { // 重複類型
+//       type: String,
+//       enum: ['一次性', '每天', '每週', '每月'],
+//       default: '一次性'
+//     }
+//   }
+// }, {
+//   timestamps: true, // 待辦事項建立時間、更新時間
+//   versionKey: false
+// })
+
+const dependentInsuranceSchema = new Schema({
+  dependentName: {
     type: String,
-    required: [true, '請輸入待辦事項標題']
+    required: [true, '請輸入受保人姓名']
   },
-  description: {
+  dependentRelationship: {
     type: String
   },
-  dueDate: {
+  dependentBirthDate: {
+    type: Date,
+    required: [true, '請輸入受保人生日']
+  },
+  dependentIDNumber: {
+    type: String,
+    required: [true, '請輸入受保人身分證號碼']
+  },
+  dependentInsuranceStartDate: {
     type: Date
   },
-  priority: {
-    type: String,
-    enum: ['低', '中', '高'],
-    default: '中'
-  },
-  status: {
-    type: String,
-    enum: ['待處理', '進行中', '已完成'],
-    default: '待處理'
-  },
-  reminder: {
-    enabled: { // 是否啟用提醒
-      type: Boolean,
-      default: false
-    },
-    time: Date, // 提醒時間
-    isNotified: { // 是否已發送通知
-      type: Boolean,
-      default: false
-    },
-    repeatType: { // 重複類型
-      type: String,
-      enum: ['一次性', '每天', '每週', '每月'],
-      default: '一次性'
-    }
+  dependentInsuranceEndDate: {
+    type: Date
   }
-}, {
-  timestamps: true, // 待辦事項建立時間、更新時間
-  versionKey: false
 })
 
 const schema = new Schema({
-  email: {
+  name: {
     type: String,
-    required: [true, '請輸入使用者電子郵件'],
-    unique: true,
-    validate: [validator.isEmail, '使用者電子郵件格式不正確'],
-    lowercase: true
+    required: [true, '請輸入使用者姓名']
   },
-  personalEmail: {
+  englishName: {
     type: String,
-    lowercase: true
-  },
-  password: {
-    type: String,
-    required: [true, '請輸入使用者密碼']
+    uppercase: true
   },
   IDNumber: {
     type: String,
@@ -72,36 +88,18 @@ const schema = new Schema({
     unique: true,
     uppercase: true
   },
+  birthDate: {
+    type: Date,
+    required: [true, '請輸入生日']
+  },
   gender: {
     type: String,
     enum: ['男性', '女性'],
     required: [true, '請選擇性別']
   },
-  name: {
+  personalEmail: { // 個人email
     type: String,
-    required: [true, '請輸入使用者姓名']
-  },
-  englishName: {
-    type: String,
-    required: [true, '請輸入使用者英文名'],
-    uppercase: true
-  },
-  cellphone: {
-    type: String,
-    required: [true, '請輸入手機號碼'],
-    unique: true
-  },
-  salary: {
-    type: String
-  },
-  extNumber: {
-    type: String,
-    required: [true, '請輸入分機號碼'],
-    unique: true
-  },
-  birthDate: {
-    type: Date,
-    required: [true, '請輸入生日']
+    lowercase: true
   },
   permanentAddress: {
     type: String,
@@ -110,6 +108,47 @@ const schema = new Schema({
   contactAddress: {
     type: String,
     required: [true, '請輸入通訊地址']
+  },
+  email: { // 公司email
+    type: String,
+    unique: true,
+    lowercase: true
+  },
+
+  password: {
+    type: String,
+    required: [true, '請輸入使用者密碼']
+  },
+
+  phoneNumber: {
+    type: String
+  },
+  cellphone: {
+    type: String,
+    unique: true
+  },
+  salary: {
+    type: String
+  },
+  extNumber: {
+    type: String,
+    unique: true
+  },
+  printNumber: {
+    type: String,
+    unique: true
+  },
+  emergencyName: {
+    type: String
+  },
+  emergencyPhoneNumber: {
+    type: String
+  },
+  emergencyCellphone: {
+    type: String
+  },
+  emergencyRelationship: {
+    type: String
   },
   company: {
     type: ObjectId,
@@ -122,8 +161,7 @@ const schema = new Schema({
     required: true
   },
   jobTitle: {
-    type: String,
-    required: [true, '請輸入職稱']
+    type: String
   },
   role: {
     type: Number,
@@ -131,25 +169,10 @@ const schema = new Schema({
   },
   cowellAccount: {
     type: String,
-    required: [true, '請輸入科威帳號'],
     unique: true
   },
   cowellPassword: {
-    type: String,
-    required: [true, '請輸入科威密碼']
-  },
-  // nasAccount: {
-  //   type: String,
-  //   // required: [true, '請輸入 NAS 帳號'],
-  //   unique: true
-  // },
-  // nasPassword: {
-  //   type: String
-  //   // required: [true, '請輸入 NAS 密碼']
-  // },
-  guideLicense: {
-    type: Boolean,
-    default: false
+    type: String
   },
   userId: {
     type: String,
@@ -168,23 +191,77 @@ const schema = new Schema({
   resignationDate: {
     type: Date
   },
-  emergencyName: {
-    type: String,
-    required: [true, '請輸入緊急聯絡人姓名']
-  },
-  emergencyCellphone: {
-    type: String,
-    required: [true, '請輸入緊急聯絡人連絡電話']
-  },
-  emergencyRelationship: {
+
+  note: {
     type: String
   },
-  printNumber: {
+
+  // 20241123 新增欄位
+
+  healthInsuranceStartDate: {
+    type: Date,
+    default: null
+  },
+  healthInsuranceEndDate: {
+    type: Date
+  },
+  laborInsuranceStartDate: {
+    type: Date
+  },
+  laborInsuranceEndDate: {
+    type: Date
+  },
+  salaryBank: { // 薪轉銀行(代碼+名稱)
+    type: String
+  },
+  salaryBankBranch: { // 薪轉銀行分行
+    type: String
+  },
+  salaryAccountNumber: { // 薪轉銀行帳號
+    type: String
+  },
+  guideLicense: { // 導遊證  // 待處理
+    type: [Number], // 陣列
+    enum: [0, 1, 2, 3, 4],
+    default: []
+  },
+  tourManager: { // 旅遊經理人
+    type: Boolean
+  },
+  YSRCAccount: {
     type: String,
     unique: true
   },
-  note: {
+  YSRCPassword: {
     type: String
+  },
+  YS168Account: {
+    type: String,
+    unique: true
+  },
+  YS168Password: {
+    type: String
+  },
+  disabilityStatus: { // 身心障礙
+    type: String,
+    enum: ['否', '輕度', '中度'],
+    default: '無'
+  },
+  indigenousStatus: { // 是否為原住民
+    type: Boolean,
+    default: false
+  },
+  voluntaryPensionRate: {
+    type: Number
+  },
+  voluntaryPensionStartDate: {
+    type: Date
+  },
+  voluntaryPensionEndDate: {
+    type: Date
+  },
+  dependentInsurance: { // 待處理
+    type: [dependentInsuranceSchema]
   },
   resetPasswordToken: {
     type: String,
@@ -202,10 +279,10 @@ const schema = new Schema({
     type: String,
     default: 'https://res.cloudinary.com/dcwkukgf3/image/upload/v1731628234/avatar_robot_small_hzzbom.jpg'
   },
-  todos: {
-    type: [todoSchema],
-    default: []
-  },
+  // todos: {
+  //   type: [todoSchema],
+  //   default: []
+  // },
   isFirstLogin: {
     type: Boolean,
     default: true

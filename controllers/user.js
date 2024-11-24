@@ -68,22 +68,6 @@ export const create = async (req, res) => {
         from: null,
         to: result.userId
       },
-      email: {
-        from: null,
-        to: result.email
-      },
-      personalEmail: {
-        from: null,
-        to: result.personalEmail
-      },
-      gender: {
-        from: null,
-        to: result.gender
-      },
-      IDNumber: {
-        from: null,
-        to: result.IDNumber
-      },
       company: {
         from: null,
         to: companyData.name
@@ -100,42 +84,6 @@ export const create = async (req, res) => {
         from: null,
         to: result.employmentStatus
       },
-      salary: {
-        from: null,
-        to: result.salary
-      },
-      cowellAccount: {
-        from: null,
-        to: result.cowellAccount
-      },
-      cowellPassword: {
-        from: null,
-        to: result.cowellPassword
-      },
-      englishName: {
-        from: null,
-        to: result.englishName
-      },
-      permanentAddress: {
-        from: null,
-        to: result.permanentAddress
-      },
-      contactAddress: {
-        from: null,
-        to: result.contactAddress
-      },
-      emergencyName: {
-        from: null,
-        to: result.emergencyName
-      },
-      emergencyCellphone: {
-        from: null,
-        to: result.emergencyCellphone
-      },
-      emergencyRelationship: {
-        from: null,
-        to: result.emergencyRelationship
-      },
       hireDate: {
         from: null,
         to: result.hireDate
@@ -143,6 +91,84 @@ export const create = async (req, res) => {
     }
 
     // 添加可選欄位
+    if (result.email) {
+      changes.email = {
+        from: null,
+        to: result.email
+      }
+    }
+    if (result.personalEmail) {
+      changes.personalEmail = {
+        from: null,
+        to: result.personalEmail
+      }
+    }
+    if (result.gender) {
+      changes.gender = {
+        from: null,
+        to: result.gender
+      }
+    }
+    if (result.IDNumber) {
+      changes.IDNumber = {
+        from: null,
+        to: result.IDNumber
+      }
+    }
+    if (result.salary) {
+      changes.salary = {
+        from: null,
+        to: result.salary
+      }
+    }
+    if (result.cowellAccount) {
+      changes.cowellAccount = {
+        from: null,
+        to: result.cowellAccount
+      }
+    }
+    if (result.cowellPassword) {
+      changes.cowellPassword = {
+        from: null,
+        to: result.cowellPassword
+      }
+    }
+    if (result.englishName) {
+      changes.englishName = {
+        from: null,
+        to: result.englishName
+      }
+    }
+    if (result.permanentAddress) {
+      changes.permanentAddress = {
+        from: null,
+        to: result.permanentAddress
+      }
+    }
+    if (result.contactAddress) {
+      changes.contactAddress = {
+        from: null,
+        to: result.contactAddress
+      }
+    }
+    if (result.emergencyName) {
+      changes.emergencyName = {
+        from: null,
+        to: result.emergencyName
+      }
+    }
+    if (result.emergencyCellphone) {
+      changes.emergencyCellphone = {
+        from: null,
+        to: result.emergencyCellphone
+      }
+    }
+    if (result.emergencyRelationship) {
+      changes.emergencyRelationship = {
+        from: null,
+        to: result.emergencyRelationship
+      }
+    }
     if (result.jobTitle) {
       changes.jobTitle = {
         from: null,
@@ -177,6 +203,116 @@ export const create = async (req, res) => {
       changes.guideLicense = {
         from: null,
         to: result.guideLicense
+      }
+    }
+
+    // 新增的欄位
+    if (result.healthInsuranceStartDate) {
+      changes.healthInsuranceStartDate = {
+        from: null,
+        to: result.healthInsuranceStartDate
+      }
+    }
+    if (result.healthInsuranceEndDate) {
+      changes.healthInsuranceEndDate = {
+        from: null,
+        to: result.healthInsuranceEndDate
+      }
+    }
+    if (result.laborInsuranceStartDate) {
+      changes.laborInsuranceStartDate = {
+        from: null,
+        to: result.laborInsuranceStartDate
+      }
+    }
+    if (result.laborInsuranceEndDate) {
+      changes.laborInsuranceEndDate = {
+        from: null,
+        to: result.laborInsuranceEndDate
+      }
+    }
+    if (result.salaryBank) {
+      changes.salaryBank = {
+        from: null,
+        to: result.salaryBank
+      }
+    }
+    if (result.salaryBankBranch) {
+      changes.salaryBankBranch = {
+        from: null,
+        to: result.salaryBankBranch
+      }
+    }
+    if (result.salaryAccountNumber) {
+      changes.salaryAccountNumber = {
+        from: null,
+        to: result.salaryAccountNumber
+      }
+    }
+    if (result.tourManager !== undefined) {
+      changes.tourManager = {
+        from: null,
+        to: result.tourManager
+      }
+    }
+    if (result.YSRCAccount) {
+      changes.YSRCAccount = {
+        from: null,
+        to: result.YSRCAccount
+      }
+    }
+    if (result.YSRCPassword) {
+      changes.YSRCPassword = {
+        from: null,
+        to: result.YSRCPassword
+      }
+    }
+    if (result.YS168Account) {
+      changes.YS168Account = {
+        from: null,
+        to: result.YS168Account
+      }
+    }
+    if (result.YS168Password) {
+      changes.YS168Password = {
+        from: null,
+        to: result.YS168Password
+      }
+    }
+    if (result.disabilityStatus) {
+      changes.disabilityStatus = {
+        from: null,
+        to: result.disabilityStatus
+      }
+    }
+    if (result.indigenousStatus !== undefined) {
+      changes.indigenousStatus = {
+        from: null,
+        to: result.indigenousStatus
+      }
+    }
+    if (result.voluntaryPensionRate) {
+      changes.voluntaryPensionRate = {
+        from: null,
+        to: result.voluntaryPensionRate
+      }
+    }
+    if (result.voluntaryPensionStartDate) {
+      changes.voluntaryPensionStartDate = {
+        from: null,
+        to: result.voluntaryPensionStartDate
+      }
+    }
+    if (result.voluntaryPensionEndDate) {
+      changes.voluntaryPensionEndDate = {
+        from: null,
+        to: result.voluntaryPensionEndDate
+      }
+    }
+    if (result.dependentInsurance) {
+      changes.dependentInsurance = {
+        from: null,
+        to: result.dependentInsurance
       }
     }
 
@@ -231,6 +367,10 @@ export const create = async (req, res) => {
         message = '員工編號已註冊'
       } else if (error.keyValue.cowellAccount) {
         message = '科威帳號已註冊'
+      } else if (error.keyValue.YSRCAccount) {
+        message = 'YSRC帳號已註冊'
+      } else if (error.keyValue.YS168Account) {
+        message = 'YS168帳號已註冊'
       } else {
         message = '某些欄位值已註冊'
       }
@@ -259,8 +399,8 @@ export const login = async (req, res) => {
 
     // 先 populate user 对象
     const populatedUser = await User.findById(req.user._id)
-      .populate('company', 'name') // 现有的 populate
-      .populate('department', 'name departmentId') // 添加 department populate
+      .populate('company', 'name companyId') // 修改這裡,加上 companyId
+      .populate('department', 'name departmentId')
 
     const token = jwt.sign({ _id: populatedUser._id }, process.env.JWT_SECRET, { expiresIn: '10h' })
     populatedUser.tokens.push(token)
@@ -285,25 +425,51 @@ export const login = async (req, res) => {
         englishName: populatedUser.englishName,
         birthDate: populatedUser.birthDate,
         gender: populatedUser.gender,
+        IDNumber: populatedUser.IDNumber, // 新增
         cellphone: populatedUser.cellphone,
+        phoneNumber: populatedUser.phoneNumber, // 新增
         email: populatedUser.email,
         personalEmail: populatedUser.personalEmail,
         permanentAddress: populatedUser.permanentAddress,
         contactAddress: populatedUser.contactAddress,
         emergencyName: populatedUser.emergencyName,
+        emergencyPhoneNumber: populatedUser.emergencyPhoneNumber, // 新增
         emergencyCellphone: populatedUser.emergencyCellphone,
+        emergencyRelationship: populatedUser.emergencyRelationship, // 新增
         userId: populatedUser.userId,
         company: populatedUser.company,
-        department: populatedUser.department, // 现在会包含完整的部门信息
+        department: populatedUser.department,
         hireDate: populatedUser.hireDate,
+        resignationDate: populatedUser.resignationDate, // 新增
         extNumber: populatedUser.extNumber,
         printNumber: populatedUser.printNumber,
+        note: populatedUser.note, // 新增
         guideLicense: populatedUser.guideLicense,
         role: populatedUser.role,
+        employmentStatus: populatedUser.employmentStatus, // 新增
         jobTitle: populatedUser.jobTitle,
         avatar: populatedUser.avatar,
         cowellAccount: populatedUser.cowellAccount,
-        cowellPassword: populatedUser.cowellPassword
+        cowellPassword: populatedUser.cowellPassword,
+        // 新增欄位
+        healthInsuranceStartDate: populatedUser.healthInsuranceStartDate,
+        healthInsuranceEndDate: populatedUser.healthInsuranceEndDate,
+        laborInsuranceStartDate: populatedUser.laborInsuranceStartDate,
+        laborInsuranceEndDate: populatedUser.laborInsuranceEndDate,
+        salaryBank: populatedUser.salaryBank,
+        salaryBankBranch: populatedUser.salaryBankBranch,
+        salaryAccountNumber: populatedUser.salaryAccountNumber,
+        tourManager: populatedUser.tourManager,
+        YSRCAccount: populatedUser.YSRCAccount,
+        YSRCPassword: populatedUser.YSRCPassword,
+        YS168Account: populatedUser.YS168Account,
+        YS168Password: populatedUser.YS168Password,
+        disabilityStatus: populatedUser.disabilityStatus,
+        indigenousStatus: populatedUser.indigenousStatus,
+        voluntaryPensionRate: populatedUser.voluntaryPensionRate,
+        voluntaryPensionStartDate: populatedUser.voluntaryPensionStartDate,
+        voluntaryPensionEndDate: populatedUser.voluntaryPensionEndDate,
+        dependentInsurance: populatedUser.dependentInsurance
       }
     })
   } catch (error) {
@@ -336,7 +502,7 @@ export const googleLogin = async (req, res) => {
 
     // 修改这里：同时 populate company 和 department
     const user = await User.findOne({ email })
-      .populate('company', 'name')
+      .populate('company', 'name companyId')
       .populate('department', 'name departmentId')
 
     if (!user) {
@@ -376,25 +542,51 @@ export const googleLogin = async (req, res) => {
         englishName: user.englishName,
         birthDate: user.birthDate,
         gender: user.gender,
+        IDNumber: user.IDNumber, // 新增
         cellphone: user.cellphone,
+        phoneNumber: user.phoneNumber, // 新增
         email: user.email,
         personalEmail: user.personalEmail,
         permanentAddress: user.permanentAddress,
         contactAddress: user.contactAddress,
         emergencyName: user.emergencyName,
+        emergencyPhoneNumber: user.emergencyPhoneNumber, // 新增
         emergencyCellphone: user.emergencyCellphone,
+        emergencyRelationship: user.emergencyRelationship, // 新增
         userId: user.userId,
         company: user.company,
-        department: user.department, // 现在会包含完整的部门信息
+        department: user.department,
         hireDate: user.hireDate,
+        resignationDate: user.resignationDate, // 新增
         extNumber: user.extNumber,
         printNumber: user.printNumber,
+        note: user.note, // 新增
         guideLicense: user.guideLicense,
         role: user.role,
+        employmentStatus: user.employmentStatus, // 新增
         jobTitle: user.jobTitle,
         avatar: user.avatar,
         cowellAccount: user.cowellAccount,
-        cowellPassword: user.cowellPassword
+        cowellPassword: user.cowellPassword,
+        // 新增欄位
+        healthInsuranceStartDate: user.healthInsuranceStartDate,
+        healthInsuranceEndDate: user.healthInsuranceEndDate,
+        laborInsuranceStartDate: user.laborInsuranceStartDate,
+        laborInsuranceEndDate: user.laborInsuranceEndDate,
+        salaryBank: user.salaryBank,
+        salaryBankBranch: user.salaryBankBranch,
+        salaryAccountNumber: user.salaryAccountNumber,
+        tourManager: user.tourManager,
+        YSRCAccount: user.YSRCAccount,
+        YSRCPassword: user.YSRCPassword,
+        YS168Account: user.YS168Account,
+        YS168Password: user.YS168Password,
+        disabilityStatus: user.disabilityStatus,
+        indigenousStatus: user.indigenousStatus,
+        voluntaryPensionRate: user.voluntaryPensionRate,
+        voluntaryPensionStartDate: user.voluntaryPensionStartDate,
+        voluntaryPensionEndDate: user.voluntaryPensionEndDate,
+        dependentInsurance: user.dependentInsurance
       }
     })
   } catch (error) {
@@ -436,8 +628,8 @@ export const googleLogin = async (req, res) => {
 export const profile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
-      .populate('company', 'name') // populate 公司資訊
-      .populate('department', 'name companyId') // populate 部門資訊
+      .populate('company', 'name companyId') // 修改這裡,加上 companyId
+      .populate('department', 'name departmentId')
 
     res.status(StatusCodes.OK).json({
       success: true,
@@ -450,6 +642,7 @@ export const profile = async (req, res) => {
         name: user.name,
         englishName: user.englishName,
         cellphone: user.cellphone,
+        phoneNumber: user.phoneNumber, // 新增
         salary: user.salary,
         extNumber: user.extNumber,
         birthDate: user.birthDate,
@@ -459,79 +652,45 @@ export const profile = async (req, res) => {
         company: user.company,
         jobTitle: user.jobTitle,
         role: user.role,
+        employmentStatus: user.employmentStatus, // 新增
         userId: user.userId,
         hireDate: user.hireDate,
+        resignationDate: user.resignationDate, // 新增
         emergencyName: user.emergencyName,
+        emergencyPhoneNumber: user.emergencyPhoneNumber, // 新增
         emergencyCellphone: user.emergencyCellphone,
+        emergencyRelationship: user.emergencyRelationship, // 新增
         printNumber: user.printNumber,
+        note: user.note, // 新增
         guideLicense: user.guideLicense,
         avatar: user.avatar,
         cowellAccount: user.cowellAccount,
-        cowellPassword: user.cowellPassword
+        cowellPassword: user.cowellPassword,
+        // 新增欄位
+        healthInsuranceStartDate: user.healthInsuranceStartDate,
+        healthInsuranceEndDate: user.healthInsuranceEndDate,
+        laborInsuranceStartDate: user.laborInsuranceStartDate,
+        laborInsuranceEndDate: user.laborInsuranceEndDate,
+        salaryBank: user.salaryBank,
+        salaryBankBranch: user.salaryBankBranch,
+        salaryAccountNumber: user.salaryAccountNumber,
+        tourManager: user.tourManager,
+        YSRCAccount: user.YSRCAccount,
+        YSRCPassword: user.YSRCPassword,
+        YS168Account: user.YS168Account,
+        YS168Password: user.YS168Password,
+        disabilityStatus: user.disabilityStatus,
+        indigenousStatus: user.indigenousStatus,
+        voluntaryPensionRate: user.voluntaryPensionRate,
+        voluntaryPensionStartDate: user.voluntaryPensionStartDate,
+        voluntaryPensionEndDate: user.voluntaryPensionEndDate,
+        dependentInsurance: user.dependentInsurance
       }
     })
   } catch (error) {
     handleError(res, error)
   }
 }
-
-// // 新增一個日期處理的輔助函數
-// const getDateRange = (dateType, startDate, endDate) => {
-//   const start = new Date(startDate)
-//   const end = new Date(endDate)
-//   start.setHours(0, 0, 0, 0)
-//   end.setHours(23, 59, 59, 999)
-
-//   switch (dateType) {
-//     case 'hireDate':
-//       return {
-//         hireDate: {
-//           $gte: start,
-//           $lte: end
-//         }
-//       }
-//     case 'resignationDate':
-//       return {
-//         resignationDate: {
-//           $gte: start,
-//           $lte: end
-//         }
-//       }
-//     case 'birthDate':
-//       return {
-//         $and: [
-//           {
-//             birthDate: {
-//               $exists: true
-//             }
-//           },
-//           {
-//             $expr: {
-//               $or: [
-//                 // 考慮同年的情況
-//                 {
-//                   $and: [
-//                     { $eq: [{ $year: '$birthDate' }, start.getFullYear()] },
-//                     { $gte: [{ $dayOfYear: '$birthDate' }, { $dayOfYear: start }] },
-//                     { $lte: [{ $dayOfYear: '$birthDate' }, { $dayOfYear: end }] }
-//                   ]
-//                 },
-//                 // 考慮跨年的情況
-//                 {
-//                   $or: [
-//                     { $gte: [{ $dayOfYear: '$birthDate' }, { $dayOfYear: start }] },
-//                     { $lte: [{ $dayOfYear: '$birthDate' }, { $dayOfYear: end }] }
-//                   ]
-//                 }
-//               ]
-//             }
-//           }
-//         ]
-//       }
-//     default:
-//       return {}
-//   }
-// }
 
 // 取得所有用戶資料（包含分頁與排序）
 export const getAll = async (req, res) => {
@@ -540,48 +699,7 @@ export const getAll = async (req, res) => {
     const page = parseInt(req.query.page) || 1
     const query = {}
 
-    // // 保留原有的生日查詢邏輯，因為它與 search 函式中的處理不同
-    // if (req.query.dateType === 'birthDate' && req.query.birthDateStart && req.query.birthDateEnd) {
-    //   const startDate = new Date(req.query.birthDateStart)
-    //   const endDate = new Date(req.query.birthDateEnd)
-    //   const startMonth = startDate.getMonth() + 1
-    //   const startDay = startDate.getDate()
-    //   const endMonth = endDate.getMonth() + 1
-    //   const endDay = endDate.getDate()
-
-    //   query.$expr = {
-    //     $let: {
-    //       vars: {
-    //         birthMonth: { $month: '$birthDate' },
-    //         birthDay: { $dayOfMonth: '$birthDate' }
-    //       },
-    //       in: {
-    //         $or: [
-    //           {
-    //             $and: [
-    //               { $eq: ['$$birthMonth', startMonth] },
-    //               { $gte: ['$$birthDay', startDay] }
-    //             ]
-    //           },
-    //           {
-    //             $and: [
-    //               { $gt: ['$$birthMonth', startMonth] },
-    //               { $lt: ['$$birthMonth', endMonth] }
-    //             ]
-    //           },
-    //           {
-    //             $and: [
-    //               { $eq: ['$$birthMonth', endMonth] },
-    //               { $lte: ['$$birthDay', endDay] }
-    //             ]
-    //           }
-    //         ]
-    //       }
-    //     }
-    //   }
-    // }
-
-    // 處理其他查詢條件，保持原有邏輯
+    // 處理其他查詢條件,保持原有邏輯
     if (req.query.role !== undefined && req.query.role !== '') {
       query.role = Number(req.query.role)
     }
@@ -604,6 +722,18 @@ export const getAll = async (req, res) => {
 
     if (req.query.employmentStatus) {
       query.employmentStatus = req.query.employmentStatus
+    }
+
+    if (req.query.tourManager !== undefined) {
+      query.tourManager = req.query.tourManager === 'true'
+    }
+
+    if (req.query.disabilityStatus) {
+      query.disabilityStatus = req.query.disabilityStatus
+    }
+
+    if (req.query.indigenousStatus !== undefined) {
+      query.indigenousStatus = req.query.indigenousStatus === 'true'
     }
 
     console.log('Final query:', JSON.stringify(query, null, 2))
@@ -636,7 +766,8 @@ export const getAll = async (req, res) => {
     })
   }
 }
-export const getSuggestions = async (req, res) => {
+
+export const getSuggestions = async (req, res) => { // 使用在auditLog的查詢user
   try {
     const search = req.query.search || ''
 
@@ -725,137 +856,6 @@ export const getEmployeeStats = async (req, res) => {
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: '獲取員工統計資料失敗',
-      error: error.message
-    })
-  }
-}
-
-export const searchByDateRange = async (req, res) => {
-  try {
-    const {
-      dateType,
-      startDate,
-      endDate,
-      page = 1,
-      itemsPerPage = 10,
-      sortBy = 'userId',
-      sortOrder = 'asc',
-      companyId,
-      departmentId,
-      employmentStatus
-    } = req.query
-
-    if (!dateType || !startDate || !endDate) {
-      return res.status(StatusCodes.BAD_REQUEST).json({
-        success: false,
-        message: '缺少必要的日期參數'
-      })
-    }
-
-    const query = {}
-    const start = new Date(startDate)
-    const end = new Date(endDate)
-
-    start.setHours(0, 0, 0, 0)
-    end.setHours(23, 59, 59, 999)
-
-    // 在 switch 外部先定義變量
-    let startMonth, startDay, endMonth, endDay
-
-    // 根據不同的日期類型設置查詢條件
-    switch (dateType) {
-      case 'hireDate': {
-        query.hireDate = { $gte: start, $lte: end }
-        break
-      }
-      case 'resignationDate': {
-        query.resignationDate = { $gte: start, $lte: end }
-        break
-      }
-      case 'birthDate': {
-        startMonth = start.getMonth() + 1
-        startDay = start.getDate()
-        endMonth = end.getMonth() + 1
-        endDay = end.getDate()
-
-        query.$expr = {
-          $let: {
-            vars: {
-              birthMonth: { $month: '$birthDate' },
-              birthDay: { $dayOfMonth: '$birthDate' }
-            },
-            in: {
-              $or: [
-                {
-                  $and: [
-                    { $eq: ['$$birthMonth', startMonth] },
-                    { $gte: ['$$birthDay', startDay] }
-                  ]
-                },
-                {
-                  $and: [
-                    { $gt: ['$$birthMonth', startMonth] },
-                    { $lt: ['$$birthMonth', endMonth] }
-                  ]
-                },
-                {
-                  $and: [
-                    { $eq: ['$$birthMonth', endMonth] },
-                    { $lte: ['$$birthDay', endDay] }
-                  ]
-                }
-              ]
-            }
-          }
-        }
-        break
-      }
-      default: {
-        return res.status(StatusCodes.BAD_REQUEST).json({
-          success: false,
-          message: '無效的日期類型'
-        })
-      }
-    }
-
-    // 添加其他篩選條件
-    if (companyId) {
-      query.company = new mongoose.Types.ObjectId(companyId)
-    }
-    if (departmentId) {
-      query.department = new mongoose.Types.ObjectId(departmentId)
-    }
-    if (employmentStatus) {
-      query.employmentStatus = employmentStatus
-    }
-
-    console.log('Date search query:', JSON.stringify(query, null, 2))
-
-    const [result, total] = await Promise.all([
-      User.find(query)
-        .populate('company', 'name companyId')
-        .populate('department', 'name departmentId')
-        .sort({ [sortBy]: sortOrder === 'desc' ? -1 : 1 })
-        .skip((page - 1) * itemsPerPage)
-        .limit(itemsPerPage),
-      User.countDocuments(query)
-    ])
-
-    res.status(StatusCodes.OK).json({
-      success: true,
-      message: '',
-      result: {
-        data: result,
-        totalItems: total,
-        itemsPerPage: Number(itemsPerPage),
-        currentPage: Number(page)
-      }
-    })
-  } catch (error) {
-    console.error('Date search error:', error)
-    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-      success: false,
-      message: '日期搜尋失敗',
       error: error.message
     })
   }
@@ -1550,16 +1550,12 @@ export const search = async (req, res) => {
       const startDate = new Date(req.query.startDate)
       const endDate = new Date(req.query.endDate)
 
-      // 如果開始日期和結束日期相同，將結束日期設為當天的最後一毫秒
+      // 如果開始日期和結束日期相同,將結束日期設為當天的最後一毫秒
       if (startDate.toDateString() === endDate.toDateString()) {
         endDate.setHours(23, 59, 59, 999)
       }
 
-      if (req.query.dateType === 'hireDate') {
-        query.hireDate = { $gte: startDate, $lte: endDate }
-      } else if (req.query.dateType === 'resignationDate') {
-        query.resignationDate = { $gte: startDate, $lte: endDate }
-      }
+      query[req.query.dateType] = { $gte: startDate, $lte: endDate }
     }
 
     // 處理其他查詢條件
@@ -1581,6 +1577,15 @@ export const search = async (req, res) => {
     if (req.query.employmentStatus) {
       query.employmentStatus = req.query.employmentStatus
     }
+    if (req.query.tourManager !== undefined) {
+      query.tourManager = req.query.tourManager === 'true'
+    }
+    if (req.query.disabilityStatus) {
+      query.disabilityStatus = req.query.disabilityStatus
+    }
+    if (req.query.indigenousStatus !== undefined) {
+      query.indigenousStatus = req.query.indigenousStatus === 'true'
+    }
 
     // 處理快速搜尋
     if (req.query.quickSearch) {
@@ -1591,7 +1596,12 @@ export const search = async (req, res) => {
         { email: searchRegex },
         { cellphone: searchRegex },
         { extNumber: searchRegex },
-        { personalEmail: searchRegex }
+        { personalEmail: searchRegex },
+        { IDNumber: searchRegex },
+        { permanentAddress: searchRegex },
+        { contactAddress: searchRegex },
+        { emergencyName: searchRegex },
+        { emergencyCellphone: searchRegex }
       ]
     }
 
@@ -1621,20 +1631,26 @@ export const search = async (req, res) => {
       },
       { $unwind: { path: '$department', preserveNullAndEmptyArrays: true } },
       { $sort: { [sortField]: sortOrder } },
-      { $skip: (page - 1) * itemsPerPage },
-      { $limit: itemsPerPage }
+      {
+        $facet: {
+          metadata: [{ $count: 'total' }],
+          data: [{ $skip: (page - 1) * itemsPerPage }, { $limit: itemsPerPage }]
+        }
+      }
     ]
 
-    const [result, totalCount] = await Promise.all([
-      User.aggregate(pipeline),
-      User.countDocuments(query)
-    ])
+    const [result] = await User.aggregate(pipeline)
+
+    const totalCount = result.metadata[0]?.total || 0
+    const data = result.data
+
+    console.log('Total matching documents:', totalCount)
 
     res.status(StatusCodes.OK).json({
       success: true,
       message: '',
       result: {
-        data: result,
+        data,
         totalItems: totalCount,
         itemsPerPage,
         currentPage: page
@@ -1644,7 +1660,7 @@ export const search = async (req, res) => {
     console.error('Search users error:', error)
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
-      message: '搜索用户时发生错误',
+      message: '搜索用戶時發生錯誤',
       error: error.message
     })
   }
