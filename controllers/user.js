@@ -60,6 +60,9 @@ export const create = async (req, res) => {
     const { company, department } = req.body
     const companyData = await Company.findById(company)
 
+    const companyName = companyData.name
+    const departmentName = departmentData.name
+
     if (!companyData) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         message: '找不到選定的公司'
@@ -80,270 +83,181 @@ export const create = async (req, res) => {
       isFirstLogin: true
     })
 
-    // 更完整的變更記錄
-    const changes = {
-      name: {
-        from: null,
-        to: result.name
-      },
-      userId: {
-        from: null,
-        to: result.userId
-      },
-      company: {
-        from: null,
-        to: companyData.name
-      },
-      department: {
-        from: null,
-        to: departmentData.name
-      },
-      role: {
-        from: null,
-        to: roleNames[result.role]
-      },
-      employmentStatus: {
-        from: null,
-        to: result.employmentStatus
-      },
-      hireDate: {
-        from: null,
-        to: result.hireDate
-      }
+    // 欄位映射定義
+    const fieldMappings = {
+      name: '姓名',
+      englishName: '英文名',
+      IDNumber: '身分證號碼',
+      birthDate: '生日',
+      gender: '性別',
+      personalEmail: '個人Email',
+      permanentAddress: '戶籍地址',
+      contactAddress: '聯絡地址',
+      email: '公司Email',
+      phoneNumber: '室內電話',
+      cellphone: '手機號碼',
+      salary: '基本薪資',
+      extNumber: '分機號碼',
+      printNumber: '列印編號',
+      emergencyName: '緊急聯絡人姓名',
+      emergencyPhoneNumber: '緊急聯絡人室內電話',
+      emergencyCellphone: '緊急聯絡人手機',
+      emergencyRelationship: '緊急聯絡人關係',
+      jobTitle: '職稱',
+      role: '身分別',
+      cowellAccount: '科威帳號',
+      cowellPassword: '科威密碼',
+      userId: '員工編號',
+      employmentStatus: '任職狀態',
+      hireDate: '入職日期',
+      resignationDate: '離職日期',
+      note: '備註',
+      healthInsuranceStartDate: '健保加保日期',
+      healthInsuranceEndDate: '健保退保日期',
+      laborInsuranceStartDate: '勞保加保日期',
+      laborInsuranceEndDate: '勞保退保日期',
+      salaryBank: '薪轉銀行',
+      salaryBankBranch: '薪轉分行',
+      salaryAccountNumber: '薪轉帳戶號碼',
+      guideLicense: '導遊證',
+      tourManager: '旅遊經理人',
+      YSRCAccount: 'YSRC帳號',
+      YSRCPassword: 'YSRC密碼',
+      YS168Account: 'YS168帳號',
+      YS168Password: 'YS168密碼',
+      disabilityStatus: '身心障礙身份',
+      indigenousStatus: '原住民身份',
+      voluntaryPensionRate: '勞退自提比率',
+      voluntaryPensionStartDate: '勞退自提加保日期',
+      voluntaryPensionEndDate: '勞退自提退保日期',
+      dependentInsurance: '眷屬保險資料',
+      tourismReportDate: '觀光局申報到職日期'
     }
 
-    // 添加可選欄位
-    if (result.email) {
-      changes.email = {
-        from: null,
-        to: result.email
+    // 建立 changes 物件
+    const changes = {}
+
+    // 定義必填欄位和有預設值的欄位
+    const requiredFields = [
+      'name', 'IDNumber', 'gender', 'birthDate', 'permanentAddress', 'contactAddress',
+      'role', 'hireDate', 'employmentStatus', 'email',
+      'disabilityStatus', 'indigenousStatus', 'tourManager', 'guideLicense', 'salaryBank'
+    ]
+
+    requiredFields.forEach(field => {
+      let value = result[field]
+
+      // 特殊處理 role
+      if (field === 'role') {
+        value = roleNames[value] || '未知'
       }
-    }
-    if (result.personalEmail) {
-      changes.personalEmail = {
-        from: null,
-        to: result.personalEmail
+
+      // 特殊處理公司和部門
+      if (field === 'company') {
+        value = companyName
+      } else if (field === 'department') {
+        value = departmentName
       }
-    }
-    if (result.gender) {
-      changes.gender = {
-        from: null,
-        to: result.gender
+
+      // 特殊處理日期
+      if (value instanceof Date) {
+        value = new Date(value).toISOString().split('T')[0]
       }
-    }
-    if (result.IDNumber) {
-      changes.IDNumber = {
-        from: null,
-        to: result.IDNumber
+
+      // 特殊處理導遊證
+      if (field === 'guideLicense') {
+        const licenseTypes = {
+          0: '無',
+          1: '華語導遊',
+          2: '外語導遊',
+          3: '華語領隊',
+          4: '外語領隊'
+        }
+
+        if (Array.isArray(value)) {
+          if (value.length === 0 || (value.length === 1 && value[0] === 0)) {
+            value = '無'
+          } else {
+            value = value.map(type => licenseTypes[type] || '未知').join('、')
+          }
+        } else {
+          value = '無'
+        }
       }
-    }
-    if (result.salary) {
-      changes.salary = {
-        from: null,
-        to: result.salary
+
+      // 特殊處理布林值
+      if (typeof value === 'boolean') {
+        value = value ? '是' : '否'
       }
-    }
-    if (result.cowellAccount) {
-      changes.cowellAccount = {
+
+      changes[fieldMappings[field]] = {
         from: null,
-        to: result.cowellAccount
+        to: value
       }
-    }
-    if (result.cowellPassword) {
-      changes.cowellPassword = {
-        from: null,
-        to: result.cowellPassword
+    })
+
+    // 處理其他欄位
+    Object.entries(result.toObject()).forEach(([key, value]) => {
+      // 排除不需要或已記錄的欄位
+      if (
+        requiredFields.includes(key) ||
+    key === 'formStatus' || key === '_id' || key === '__v' ||
+    key === 'password' || key === 'tokens' || key === 'createdAt' ||
+    key === 'updatedAt' || key === 'isFirstLogin' || key === 'avatar' ||
+    !fieldMappings[key]
+      ) {
+        return
       }
-    }
-    if (result.englishName) {
-      changes.englishName = {
-        from: null,
-        to: result.englishName
+
+      // 只記錄有值的欄位
+      if (value !== null && value !== undefined && value !== '') {
+        // 特殊處理日期格式
+        if (value instanceof Date) {
+          changes[fieldMappings[key]] = {
+            from: null,
+            to: new Date(value).toISOString().split('T')[0]
+          }
+          return
+        }
+
+        // 特殊處理眷屬保險資料
+        if (key === 'dependentInsurance' && Array.isArray(value)) {
+          // 只有當陣列不為空時才記錄
+          if (value.length > 0) {
+            const formattedDependents = value.map(dep => ({
+              姓名: dep.dependentName,
+              關係: dep.dependentRelationship,
+              生日: dep.dependentBirthDate ? new Date(dep.dependentBirthDate).toISOString().split('T')[0] : null,
+              身分證號: dep.dependentIDNumber,
+              加保日期: dep.dependentInsuranceStartDate ? new Date(dep.dependentInsuranceStartDate).toISOString().split('T')[0] : null,
+              退保日期: dep.dependentInsuranceEndDate ? new Date(dep.dependentInsuranceEndDate).toISOString().split('T')[0] : null
+            }))
+            changes[fieldMappings[key]] = {
+              from: null,
+              to: formattedDependents
+            }
+          }
+          return
+        }
+
+        changes[fieldMappings[key]] = {
+          from: null,
+          to: value
+        }
       }
-    }
-    if (result.permanentAddress) {
-      changes.permanentAddress = {
-        from: null,
-        to: result.permanentAddress
-      }
-    }
-    if (result.contactAddress) {
-      changes.contactAddress = {
-        from: null,
-        to: result.contactAddress
-      }
-    }
-    if (result.emergencyName) {
-      changes.emergencyName = {
-        from: null,
-        to: result.emergencyName
-      }
-    }
-    if (result.emergencyCellphone) {
-      changes.emergencyCellphone = {
-        from: null,
-        to: result.emergencyCellphone
-      }
-    }
-    if (result.emergencyRelationship) {
-      changes.emergencyRelationship = {
-        from: null,
-        to: result.emergencyRelationship
-      }
-    }
-    if (result.jobTitle) {
-      changes.jobTitle = {
-        from: null,
-        to: result.jobTitle
-      }
-    }
-    if (result.cellphone) {
-      changes.cellphone = {
-        from: null,
-        to: result.cellphone
-      }
-    }
-    if (result.extNumber) {
-      changes.extNumber = {
-        from: null,
-        to: result.extNumber
-      }
-    }
-    if (result.birthDate) {
-      changes.birthDate = {
-        from: null,
-        to: result.birthDate
-      }
-    }
-    if (result.printNumber) {
-      changes.printNumber = {
-        from: null,
-        to: result.printNumber
-      }
-    }
-    if (result.guideLicense !== undefined) {
-      changes.guideLicense = {
-        from: null,
-        to: result.guideLicense
-      }
+    })
+
+    changes['所屬公司'] = {
+      from: null,
+      to: companyName
     }
 
-    // 新增的欄位
-    if (result.healthInsuranceStartDate) {
-      changes.healthInsuranceStartDate = {
-        from: null,
-        to: result.healthInsuranceStartDate
-      }
-    }
-    if (result.healthInsuranceEndDate) {
-      changes.healthInsuranceEndDate = {
-        from: null,
-        to: result.healthInsuranceEndDate
-      }
-    }
-    if (result.laborInsuranceStartDate) {
-      changes.laborInsuranceStartDate = {
-        from: null,
-        to: result.laborInsuranceStartDate
-      }
-    }
-    if (result.laborInsuranceEndDate) {
-      changes.laborInsuranceEndDate = {
-        from: null,
-        to: result.laborInsuranceEndDate
-      }
-    }
-    if (result.salaryBank) {
-      changes.salaryBank = {
-        from: null,
-        to: result.salaryBank
-      }
-    }
-    if (result.salaryBankBranch) {
-      changes.salaryBankBranch = {
-        from: null,
-        to: result.salaryBankBranch
-      }
-    }
-    if (result.salaryAccountNumber) {
-      changes.salaryAccountNumber = {
-        from: null,
-        to: result.salaryAccountNumber
-      }
-    }
-    if (result.tourManager !== undefined) {
-      changes.tourManager = {
-        from: null,
-        to: result.tourManager
-      }
-    }
-    if (result.YSRCAccount) {
-      changes.YSRCAccount = {
-        from: null,
-        to: result.YSRCAccount
-      }
-    }
-    if (result.YSRCPassword) {
-      changes.YSRCPassword = {
-        from: null,
-        to: result.YSRCPassword
-      }
-    }
-    if (result.YS168Account) {
-      changes.YS168Account = {
-        from: null,
-        to: result.YS168Account
-      }
-    }
-    if (result.YS168Password) {
-      changes.YS168Password = {
-        from: null,
-        to: result.YS168Password
-      }
-    }
-    if (result.disabilityStatus) {
-      changes.disabilityStatus = {
-        from: null,
-        to: result.disabilityStatus
-      }
-    }
-    if (result.indigenousStatus !== undefined) {
-      changes.indigenousStatus = {
-        from: null,
-        to: result.indigenousStatus
-      }
-    }
-    if (result.voluntaryPensionRate) {
-      changes.voluntaryPensionRate = {
-        from: null,
-        to: result.voluntaryPensionRate
-      }
-    }
-    if (result.voluntaryPensionStartDate) {
-      changes.voluntaryPensionStartDate = {
-        from: null,
-        to: result.voluntaryPensionStartDate
-      }
-    }
-    if (result.voluntaryPensionEndDate) {
-      changes.voluntaryPensionEndDate = {
-        from: null,
-        to: result.voluntaryPensionEndDate
-      }
-    }
-    if (result.dependentInsurance) {
-      changes.dependentInsurance = {
-        from: null,
-        to: result.dependentInsurance
-      }
-    }
-    if (result.tourismReportDate) {
-      changes.tourismReportDate = {
-        from: null,
-        to: result.tourismReportDate
-      }
+    changes['部門'] = {
+      from: null,
+      to: departmentName
     }
 
+    // 創建異動記錄
     await AuditLog.create({
       operatorId: req.user._id,
       operatorInfo: {
@@ -1051,7 +965,6 @@ export const changePassword = async (req, res) => {
 }
 
 // 編輯用戶資料（僅限管理員）
-// 在 user controller 中修改 edit 函數
 export const edit = async (req, res) => {
   try {
     if (!validator.isMongoId(req.params.id)) throw new Error('ID')
@@ -1067,88 +980,226 @@ export const edit = async (req, res) => {
     const updateData = { ...req.body }
     delete updateData.password // 禁止直接更新密碼
 
+    // 欄位映射定義
+    const fieldMappings = {
+      name: '姓名',
+      englishName: '英文名',
+      IDNumber: '身分證號碼',
+      birthDate: '生日',
+      gender: '性別',
+      personalEmail: '個人Email',
+      permanentAddress: '戶籍地址',
+      contactAddress: '聯絡地址',
+      email: '公司Email',
+      phoneNumber: '室內電話',
+      cellphone: '手機號碼',
+      salary: '基本薪資',
+      extNumber: '分機號碼',
+      printNumber: '列印編號',
+      emergencyName: '緊急聯絡人姓名',
+      emergencyPhoneNumber: '緊急聯絡人室內電話',
+      emergencyCellphone: '緊急聯絡人手機',
+      emergencyRelationship: '緊急聯絡人關係',
+      jobTitle: '職稱',
+      role: '身分別',
+      cowellAccount: '科威帳號',
+      cowellPassword: '科威密碼',
+      userId: '員工編號',
+      employmentStatus: '任職狀態',
+      hireDate: '入職日期',
+      resignationDate: '離職日期',
+      note: '備註',
+      healthInsuranceStartDate: '健保加保日期',
+      healthInsuranceEndDate: '健保退保日期',
+      laborInsuranceStartDate: '勞保加保日期',
+      laborInsuranceEndDate: '勞保退保日期',
+      salaryBank: '薪轉銀行',
+      salaryBankBranch: '薪轉分行',
+      salaryAccountNumber: '薪轉帳戶號碼',
+      guideLicense: '導遊證',
+      tourManager: '旅遊經理人',
+      YSRCAccount: 'YSRC帳號',
+      YSRCPassword: 'YSRC密碼',
+      YS168Account: 'YS168帳號',
+      YS168Password: 'YS168密碼',
+      disabilityStatus: '身心障礙身份',
+      indigenousStatus: '原住民身份',
+      voluntaryPensionRate: '勞退自提比率',
+      voluntaryPensionStartDate: '勞退自提加保日期',
+      voluntaryPensionEndDate: '勞退自提退保日期',
+      dependentInsurance: '眷屬保險資料',
+      tourismReportDate: '觀光局申報到職日期'
+    }
+
     // 創建變更記錄物件
     const auditChanges = {}
 
-    // 處理所有欄位的變更
-    const updateFields = [
-      'userId',
-      'name',
-      'email',
-      'personalEmail',
-      'gender',
-      'IDNumber',
-      'salary',
-      'englishName',
-      'permanentAddress',
-      'contactAddress',
-      'emergencyName',
-      'emergencyCellphone',
-      'emergencyRelationship',
-      'hireDate',
-      'birthDate',
-      'extNumber',
-      'printNumber',
-      'guideLicense',
-      'cowellAccount',
-      'cowellPassword',
-      'employmentStatus',
-      'jobTitle',
-      'cellphone',
-      'role',
-      'avatar',
-      'note',
-      'tourManager',
-      'YSRCAccount',
-      'YSRCPassword',
-      'YS168Account',
-      'YS168Password',
-      'disabilityStatus',
-      'indigenousStatus',
-      'voluntaryPensionRate',
-      'voluntaryPensionStartDate',
-      'voluntaryPensionEndDate',
-      'dependentInsurance',
-      'tourismReportDate'
-    ]
+    // if (updateData.formStatus !== undefined && updateData.formStatus !== originalUser.formStatus) {
+    //   auditChanges['表單狀態'] = {
+    //     from: originalUser.formStatus,
+    //     to: updateData.formStatus
+    //   }
+    // }
 
-    // 比較原始數據和更新數據，記錄變更
-    updateFields.forEach(field => {
-      const originalValue = originalUser[field] || null
-      const updatedValue = updateData[field] || null
+    // 檢查公司變更
+    if (updateData.company && updateData.company !== originalUser.company?._id.toString()) {
+      const newCompany = await Company.findById(updateData.company)
+      if (newCompany) {
+        auditChanges['所屬公司'] = {
+          from: originalUser.company?.name || null,
+          to: newCompany.name
+        }
+      }
+    }
 
-      if (originalValue?.toString() !== updatedValue?.toString()) {
-        auditChanges[field] = { from: originalValue, to: updatedValue }
+    // 檢查部門變更
+    if (updateData.department && updateData.department !== originalUser.department?._id.toString()) {
+      const newDepartment = await Department.findById(updateData.department)
+      if (newDepartment) {
+        auditChanges['部門'] = {
+          from: originalUser.department?.name || null,
+          to: newDepartment.name
+        }
+      }
+    }
+
+    // 檢查每個欄位的變更
+    Object.entries(updateData).forEach(([key, newValue]) => {
+      // 跳過不需要記錄的欄位
+      if (key === 'formStatus' || key === '_id' || key === '__v' ||
+          key === 'password' || key === 'tokens' || key === 'createdAt' ||
+          key === 'updatedAt' || key === 'isFirstLogin' || key === 'avatar' ||
+          key === 'company' || key === 'department' || !fieldMappings[key]) {
+        return
+      }
+
+      const originalValue = originalUser[key]
+
+      // 處理不同類型的欄位比較
+      let hasChanged = false
+      let fromValue = null
+      let toValue = null
+
+      if (key === 'guideLicense') {
+        const licenseTypes = {
+          0: '無',
+          1: '華語導遊',
+          2: '外語導遊',
+          3: '華語領隊',
+          4: '外語領隊'
+        }
+
+        const formatLicenseText = (licenses) => {
+          // 加入型別檢查和轉換
+          if (!Array.isArray(licenses)) {
+            licenses = Array.isArray(newValue) ? newValue : [0]
+          }
+          if (licenses.length === 0) return '無'
+          if (licenses.includes(0)) return '無'
+          return licenses.map(type => licenseTypes[type] || '未知類型').join('、')
+        }
+
+        const oldValue = formatLicenseText(originalValue)
+        const newValue = formatLicenseText(updateData.guideLicense)
+
+        if (oldValue !== newValue) {
+          hasChanged = true
+          fromValue = oldValue
+          toValue = newValue
+        }
+      } else if (originalValue instanceof Date || (newValue && new Date(newValue).toString() !== 'Invalid Date')) {
+        try {
+          const originalDate = originalValue
+            ? (originalValue instanceof Date ? originalValue : new Date(originalValue))
+            : null
+          const newDate = newValue
+            ? (newValue instanceof Date ? newValue : new Date(newValue))
+            : null
+
+          const fromDateStr = originalDate ? originalDate.toISOString().split('T')[0] : null
+          const toDateStr = newDate ? newDate.toISOString().split('T')[0] : null
+
+          if (fromDateStr !== toDateStr) {
+            hasChanged = true
+            fromValue = fromDateStr
+            toValue = toDateStr
+          }
+        } catch (error) {
+          console.error('日期處理錯誤:', error, '欄位:', key)
+          // 如果日期格式錯誤，跳過這個欄位
+          return
+        }
+      } else if (key === 'dependentInsurance') {
+        const formatDependent = (dep) => {
+          if (!dep) return null
+          return {
+            姓名: dep.dependentName,
+            關係: dep.dependentRelationship,
+            生日: dep.dependentBirthDate ? new Date(dep.dependentBirthDate).toISOString().split('T')[0] : null,
+            身分證號: dep.dependentIDNumber,
+            加保日期: dep.dependentInsuranceStartDate ? new Date(dep.dependentInsuranceStartDate).toISOString().split('T')[0] : null,
+            退保日期: dep.dependentInsuranceEndDate ? new Date(dep.dependentInsuranceEndDate).toISOString().split('T')[0] : null
+          }
+        }
+
+        const originalDeps = Array.isArray(originalValue) && originalValue.length > 0
+          ? originalValue.map(formatDependent).filter(Boolean)
+          : null
+
+        const newDeps = Array.isArray(newValue) && newValue.length > 0
+          ? newValue.map(formatDependent).filter(Boolean)
+          : null
+
+        // 只比較有效的值
+        if (JSON.stringify(originalDeps) !== JSON.stringify(newDeps)) {
+          hasChanged = true
+          fromValue = originalDeps
+          toValue = newDeps
+        }
+      } else if (typeof originalValue === 'boolean' || typeof newValue === 'boolean') { // 處理布林值
+        if (originalValue !== newValue) {
+          hasChanged = true
+          fromValue = originalValue ? '是' : '否'
+          toValue = newValue ? '是' : '否'
+        }
+      } else if (key === 'role') { // 處理身分別
+        const originalRoleName = roleNames[originalValue]
+        const newRoleName = roleNames[newValue]
+
+        if (originalRoleName !== newRoleName) {
+          hasChanged = true
+          fromValue = originalRoleName
+          toValue = newRoleName
+        }
+      } else {
+        if (originalValue?.toString() !== newValue?.toString()) { // 處理一般欄位
+          hasChanged = true
+          fromValue = originalValue || null
+          toValue = newValue || null
+        }
+      }
+
+      // 只記錄有變更且不是從 null/空值變成 null/空值的欄位
+      if (hasChanged && !(
+        (fromValue === null || fromValue === '' || fromValue === undefined) &&
+        (toValue === null || toValue === '' || toValue === undefined)
+      )) {
+        auditChanges[fieldMappings[key]] = {
+          from: fromValue,
+          to: toValue
+        }
       }
     })
 
-    // 處理公司和部門的變更（需要查詢名稱）
-    if (updateData.company && updateData.company !== originalUser.company?._id.toString()) {
-      const newCompany = await Company.findById(updateData.company)
-      auditChanges.company = {
-        from: originalUser.company?.name || null,
-        to: newCompany?.name || null
-      }
-    }
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    ).populate('company', 'name')
+      .populate('department', 'name')
 
-    if (updateData.department && updateData.department !== originalUser.department?._id.toString()) {
-      const newDepartment = await Department.findById(updateData.department)
-      auditChanges.department = {
-        from: originalUser.department?.name || null,
-        to: newDepartment?.name || null
-      }
-    }
-
-    // 如果有欄位被更改才更新數據
+    // 如果有欄位被更改才更新數據和創建審計記錄
     if (Object.keys(auditChanges).length > 0) {
-      const updatedUser = await User.findByIdAndUpdate(
-        req.params.id,
-        updateData,
-        { new: true, runValidators: true }
-      )
-        .populate('company', 'name')
-        .populate('department', 'name')
-
       // 記錄變更到 AuditLog
       await AuditLog.create({
         operatorId: req.user._id,
@@ -1168,7 +1219,7 @@ export const edit = async (req, res) => {
 
       res.status(StatusCodes.OK).json({
         success: true,
-        message: '用戶資料更新成功',
+        message: Object.keys(auditChanges).length > 0 ? '用戶資料更新成功' : '沒有欄位被修改',
         result: updatedUser
       })
     } else {
@@ -1179,9 +1230,8 @@ export const edit = async (req, res) => {
       })
     }
   } catch (error) {
-    console.error(error)
+    console.error('Edit user error:', error)
 
-    // 修改錯誤處理部分
     if (error.name === 'ValidationError') {
       const key = Object.keys(error.errors)[0]
       const message = error.errors[key].message
