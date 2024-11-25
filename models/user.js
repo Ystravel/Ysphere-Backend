@@ -52,18 +52,18 @@ import UserRole from '../enums/UserRole.js'
 const dependentInsuranceSchema = new Schema({
   dependentName: {
     type: String,
-    required: [true, '請輸入受保人姓名']
+    required: [true, '請輸入眷屬姓名']
   },
   dependentRelationship: {
     type: String
   },
   dependentBirthDate: {
     type: Date,
-    required: [true, '請輸入受保人生日']
+    required: [true, '請輸入眷屬生日']
   },
   dependentIDNumber: {
     type: String,
-    required: [true, '請輸入受保人身分證號碼']
+    required: [true, '請輸入眷屬身分證號碼']
   },
   dependentInsuranceStartDate: {
     type: Date
@@ -112,7 +112,8 @@ const schema = new Schema({
   email: { // 公司email
     type: String,
     unique: true,
-    lowercase: true
+    lowercase: true,
+    required: [true, '請輸入公司email']
   },
 
   password: {
@@ -124,19 +125,16 @@ const schema = new Schema({
     type: String
   },
   cellphone: {
-    type: String,
-    unique: true
+    type: String
   },
   salary: {
     type: String
   },
   extNumber: {
-    type: String,
-    unique: true
+    type: String
   },
   printNumber: {
-    type: String,
-    unique: true
+    type: String
   },
   emergencyName: {
     type: String
@@ -168,15 +166,16 @@ const schema = new Schema({
     default: UserRole.USER
   },
   cowellAccount: {
-    type: String,
-    unique: true
+    type: String
   },
   cowellPassword: {
     type: String
   },
   userId: {
     type: String,
-    unique: true
+    sparse: true,
+    unique: true,
+    set: v => (v === '' ? null : v)
   },
   employmentStatus: {
     type: String,
@@ -185,7 +184,6 @@ const schema = new Schema({
   },
   hireDate: {
     type: Date,
-    default: Date.now,
     required: [true, '請輸入入職日期']
   },
   resignationDate: {
@@ -229,15 +227,13 @@ const schema = new Schema({
     type: Boolean
   },
   YSRCAccount: {
-    type: String,
-    unique: true
+    type: String
   },
   YSRCPassword: {
     type: String
   },
   YS168Account: {
-    type: String,
-    unique: true
+    type: String
   },
   YS168Password: {
     type: String
@@ -262,6 +258,14 @@ const schema = new Schema({
   },
   dependentInsurance: { // 待處理
     type: [dependentInsuranceSchema]
+  },
+  tourismReportDate: {
+    type: Date
+  },
+  formStatus: {
+    type: String,
+    enum: ['尚未完成', '尚缺資料', '已完成'],
+    default: '尚未完成'
   },
   resetPasswordToken: {
     type: String,
@@ -296,14 +300,10 @@ const schema = new Schema({
 })
 
 schema.index(
+  { resetPasswordExpires: 1 },
   {
-    resetPasswordToken: 1,
-    resetPasswordExpires: 1
-  },
-  {
-    sparse: true,
-    background: true,
-    expireAfterSeconds: 1800 // 30分鐘後自動刪除過期的重置token
+    expireAfterSeconds: 1800, // 設定為 30 分鐘
+    background: true // 在後台建立索引，避免阻塞應用
   }
 )
 

@@ -25,7 +25,26 @@ const transporter = nodemailer.createTransport({
 })
 
 export const create = async (req, res) => {
+  console.log('Create user:', req.body)
   try {
+    // 工具函數：將空字串轉換為 null
+    const normalizeData = (obj) => {
+      const normalized = {}
+      for (const [key, value] of Object.entries(obj)) {
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          // 遞迴處理嵌套對象
+          normalized[key] = normalizeData(value)
+        } else if (typeof value === 'string' && value.trim() === '') {
+          // 將空字串轉換為 null
+          normalized[key] = null
+        } else {
+          // 保持其他值不變
+          normalized[key] = value
+        }
+      }
+      return normalized
+    }
+
     // 先查詢部門資訊
     const departmentData = await Department.findById(req.body.department)
     if (!departmentData) {
@@ -49,8 +68,11 @@ export const create = async (req, res) => {
 
     const randomPassword = crypto.randomBytes(8).toString('hex')
 
+    // 處理請求數據，將空字串轉換為 null
+    const normalizedData = normalizeData(req.body)
+
     const result = await User.create({
-      ...req.body,
+      ...normalizedData,
       userId,
       company,
       department,
@@ -315,6 +337,12 @@ export const create = async (req, res) => {
         to: result.dependentInsurance
       }
     }
+    if (result.tourismReportDate) {
+      changes.tourismReportDate = {
+        from: null,
+        to: result.tourismReportDate
+      }
+    }
 
     await AuditLog.create({
       operatorId: req.user._id,
@@ -352,27 +380,38 @@ export const create = async (req, res) => {
         message
       })
     } else if (error.name === 'MongoServerError' && error.code === 11000) {
+      const duplicateKey = Object.keys(error.keyValue)[0]
       let message = ''
-      if (error.keyValue.email) {
-        message = 'Email已註冊'
-      } else if (error.keyValue.IDNumber) {
-        message = '身分證號碼已註冊'
-      } else if (error.keyValue.cellphone) {
-        message = '手機號碼已註冊'
-      } else if (error.keyValue.extNumber) {
-        message = '分機號碼已註冊'
-      } else if (error.keyValue.printNumber) {
-        message = '列印編號已註冊'
-      } else if (error.keyValue.userId) {
-        message = '員工編號已註冊'
-      } else if (error.keyValue.cowellAccount) {
-        message = '科威帳號已註冊'
-      } else if (error.keyValue.YSRCAccount) {
-        message = 'YSRC帳號已註冊'
-      } else if (error.keyValue.YS168Account) {
-        message = 'YS168帳號已註冊'
-      } else {
-        message = '某些欄位值已註冊'
+      switch (duplicateKey) {
+        case 'email':
+          message = '公司Email已註冊'
+          break
+        case 'IDNumber':
+          message = '身分證號碼已註冊'
+          break
+        case 'cellphone':
+          message = '手機號碼已註冊'
+          break
+        case 'extNumber':
+          message = '分機號碼已註冊'
+          break
+        case 'printNumber':
+          message = '列印編號已註冊'
+          break
+        case 'userId':
+          message = '員工編號已註冊'
+          break
+        case 'cowellAccount':
+          message = '科威帳號已註冊'
+          break
+        case 'YSRCAccount':
+          message = 'YSRC帳號已註冊'
+          break
+        case 'YS168Account':
+          message = 'YS168帳號已註冊'
+          break
+        default:
+          message = `${duplicateKey} 已被註冊`
       }
       res.status(StatusCodes.CONFLICT).json({
         success: false,
@@ -381,7 +420,8 @@ export const create = async (req, res) => {
     } else {
       res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
         success: false,
-        message: '未知錯誤'
+        message: '未知錯誤',
+        error: error.message
       })
     }
   }
@@ -469,7 +509,8 @@ export const login = async (req, res) => {
         voluntaryPensionRate: populatedUser.voluntaryPensionRate,
         voluntaryPensionStartDate: populatedUser.voluntaryPensionStartDate,
         voluntaryPensionEndDate: populatedUser.voluntaryPensionEndDate,
-        dependentInsurance: populatedUser.dependentInsurance
+        dependentInsurance: populatedUser.dependentInsurance,
+        tourismReportDate: populatedUser.tourismReportDate
       }
     })
   } catch (error) {
@@ -586,7 +627,8 @@ export const googleLogin = async (req, res) => {
         voluntaryPensionRate: user.voluntaryPensionRate,
         voluntaryPensionStartDate: user.voluntaryPensionStartDate,
         voluntaryPensionEndDate: user.voluntaryPensionEndDate,
-        dependentInsurance: user.dependentInsurance
+        dependentInsurance: user.dependentInsurance,
+        tourismReportDate: user.tourismReportDate
       }
     })
   } catch (error) {
@@ -684,7 +726,8 @@ export const profile = async (req, res) => {
         voluntaryPensionRate: user.voluntaryPensionRate,
         voluntaryPensionStartDate: user.voluntaryPensionStartDate,
         voluntaryPensionEndDate: user.voluntaryPensionEndDate,
-        dependentInsurance: user.dependentInsurance
+        dependentInsurance: user.dependentInsurance,
+        tourismReportDate: user.tourismReportDate
       }
     })
   } catch (error) {
@@ -1052,7 +1095,21 @@ export const edit = async (req, res) => {
       'employmentStatus',
       'jobTitle',
       'cellphone',
-      'role'
+      'role',
+      'avatar',
+      'note',
+      'tourManager',
+      'YSRCAccount',
+      'YSRCPassword',
+      'YS168Account',
+      'YS168Password',
+      'disabilityStatus',
+      'indigenousStatus',
+      'voluntaryPensionRate',
+      'voluntaryPensionStartDate',
+      'voluntaryPensionEndDate',
+      'dependentInsurance',
+      'tourismReportDate'
     ]
 
     // 比較原始數據和更新數據，記錄變更
