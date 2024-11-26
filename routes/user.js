@@ -16,7 +16,7 @@ import {
   remove,
   getSuggestions,
   sendInitialPassword,
-  revealCowell,
+  revealSystem,
   search
 } from '../controllers/user.js'
 import * as auth from '../middlewares/auth.js'
@@ -56,7 +56,7 @@ router.post('/:id/send-initial-password',
   sendInitialPassword
 )
 
-router.post('/reveal-cowell', auth.jwt, revealCowell)
+router.post('/reveal-system', auth.jwt, revealSystem)
 
 // 編輯用戶資料（僅限 ADMIN 和 SUPER_ADMIN）
 router.patch('/avatar', auth.jwt, upload, updateAvatar)

@@ -24,6 +24,20 @@ const transporter = nodemailer.createTransport({
   }
 })
 
+const formatDateForAuditLog = (date) => {
+  if (!date) return null
+  // 確保是 Date 對象
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return null
+
+  // 調整為台灣時間 (UTC+8)
+  const tzOffset = 8 * 60
+  const localDate = new Date(d.getTime() + tzOffset * 60 * 1000)
+
+  // 返回 YYYY-MM-DD 格式的台灣時間
+  return localDate.toISOString().split('T')[0]
+}
+
 export const create = async (req, res) => {
   console.log('Create user:', req.body)
   try {
@@ -161,7 +175,7 @@ export const create = async (req, res) => {
 
       // 特殊處理日期
       if (value instanceof Date) {
-        value = new Date(value).toISOString().split('T')[0]
+        value = formatDateForAuditLog(value)
       }
 
       // 特殊處理導遊證
@@ -227,10 +241,10 @@ export const create = async (req, res) => {
             const formattedDependents = value.map(dep => ({
               姓名: dep.dependentName,
               關係: dep.dependentRelationship,
-              生日: dep.dependentBirthDate ? new Date(dep.dependentBirthDate).toISOString().split('T')[0] : null,
+              生日: formatDateForAuditLog(dep.dependentBirthDate),
               身分證號: dep.dependentIDNumber,
-              加保日期: dep.dependentInsuranceStartDate ? new Date(dep.dependentInsuranceStartDate).toISOString().split('T')[0] : null,
-              退保日期: dep.dependentInsuranceEndDate ? new Date(dep.dependentInsuranceEndDate).toISOString().split('T')[0] : null
+              加保日期: formatDateForAuditLog(dep.dependentInsuranceStartDate),
+              退保日期: formatDateForAuditLog(dep.dependentInsuranceEndDate)
             }))
             changes[fieldMappings[key]] = {
               from: null,
@@ -1107,17 +1121,20 @@ export const edit = async (req, res) => {
           fromValue = oldValue
           toValue = newValue
         }
-      } else if (originalValue instanceof Date || (newValue && new Date(newValue).toString() !== 'Invalid Date')) {
+      } else if (typeof originalValue === 'boolean' || typeof newValue === 'boolean') { // 處理布林值
+        if (originalValue !== newValue) {
+          hasChanged = true
+          fromValue = originalValue ? '是' : '否'
+          toValue = newValue ? '是' : '否'
+        }
+      } else if (originalValue instanceof Date || (typeof newValue === 'string' && /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}\.\d{3}Z)?$/.test(newValue))) {
+        // 處理 Date 對象和 'YYYY-MM-DD' 或 'YYYY-MM-DDTHH:mm:ss.sssZ' 格式的字符串
         try {
-          const originalDate = originalValue
-            ? (originalValue instanceof Date ? originalValue : new Date(originalValue))
-            : null
-          const newDate = newValue
-            ? (newValue instanceof Date ? newValue : new Date(newValue))
-            : null
+          const originalDate = originalValue instanceof Date ? originalValue : new Date(originalValue)
+          const newDate = typeof newValue === 'string' && /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}\.\d{3}Z)?$/.test(newValue) ? new Date(newValue) : new Date(newValue)
 
-          const fromDateStr = originalDate ? originalDate.toISOString().split('T')[0] : null
-          const toDateStr = newDate ? newDate.toISOString().split('T')[0] : null
+          const fromDateStr = originalDate ? formatDateForAuditLog(originalDate) : null
+          const toDateStr = newDate ? formatDateForAuditLog(newDate) : null
 
           if (fromDateStr !== toDateStr) {
             hasChanged = true
@@ -1130,24 +1147,24 @@ export const edit = async (req, res) => {
           return
         }
       } else if (key === 'dependentInsurance') {
-        const formatDependent = (dep) => {
+        const formatDependentForAuditLog = (dep) => {
           if (!dep) return null
           return {
             姓名: dep.dependentName,
             關係: dep.dependentRelationship,
-            生日: dep.dependentBirthDate ? new Date(dep.dependentBirthDate).toISOString().split('T')[0] : null,
+            生日: formatDateForAuditLog(dep.dependentBirthDate),
             身分證號: dep.dependentIDNumber,
-            加保日期: dep.dependentInsuranceStartDate ? new Date(dep.dependentInsuranceStartDate).toISOString().split('T')[0] : null,
-            退保日期: dep.dependentInsuranceEndDate ? new Date(dep.dependentInsuranceEndDate).toISOString().split('T')[0] : null
+            加保日期: formatDateForAuditLog(dep.dependentInsuranceStartDate),
+            退保日期: formatDateForAuditLog(dep.dependentInsuranceEndDate)
           }
         }
 
         const originalDeps = Array.isArray(originalValue) && originalValue.length > 0
-          ? originalValue.map(formatDependent).filter(Boolean)
+          ? originalValue.map(formatDependentForAuditLog).filter(Boolean)
           : null
 
         const newDeps = Array.isArray(newValue) && newValue.length > 0
-          ? newValue.map(formatDependent).filter(Boolean)
+          ? newValue.map(formatDependentForAuditLog).filter(Boolean)
           : null
 
         // 只比較有效的值
@@ -1155,12 +1172,6 @@ export const edit = async (req, res) => {
           hasChanged = true
           fromValue = originalDeps
           toValue = newDeps
-        }
-      } else if (typeof originalValue === 'boolean' || typeof newValue === 'boolean') { // 處理布林值
-        if (originalValue !== newValue) {
-          hasChanged = true
-          fromValue = originalValue ? '是' : '否'
-          toValue = newValue ? '是' : '否'
         }
       } else if (key === 'role') { // 處理身分別
         const originalRoleName = roleNames[originalValue]
@@ -1608,7 +1619,7 @@ export const sendInitialPassword = async (req, res) => {
   }
 }
 
-export const revealCowell = async (req, res) => {
+export const revealSystem = async (req, res) => {
   try {
     const { password } = req.body
 
@@ -1652,20 +1663,7 @@ export const search = async (req, res) => {
     const page = parseInt(req.query.page) || 1
     const query = {}
 
-    // 處理日期查詢
-    if (req.query.dateType && req.query.startDate && req.query.endDate) {
-      const startDate = new Date(req.query.startDate)
-      const endDate = new Date(req.query.endDate)
-
-      // 如果開始日期和結束日期相同,將結束日期設為當天的最後一毫秒
-      if (startDate.toDateString() === endDate.toDateString()) {
-        endDate.setHours(23, 59, 59, 999)
-      }
-
-      query[req.query.dateType] = { $gte: startDate, $lte: endDate }
-    }
-
-    // 處理其他查詢條件
+    // 只有當有指定查詢參數時才加入查詢條件
     if (req.query.role) {
       query.role = Number(req.query.role)
     }
@@ -1678,20 +1676,38 @@ export const search = async (req, res) => {
     if (req.query.gender) {
       query.gender = req.query.gender
     }
-    if (req.query.guideLicense !== undefined) {
-      query.guideLicense = req.query.guideLicense === 'true'
-    }
     if (req.query.employmentStatus) {
       query.employmentStatus = req.query.employmentStatus
     }
-    if (req.query.tourManager !== undefined) {
-      query.tourManager = req.query.tourManager === 'true'
+    if (req.query.guideLicense) {
+      const licenseNumber = parseInt(req.query.guideLicense)
+      query.guideLicense = { $in: [licenseNumber] }
     }
     if (req.query.disabilityStatus) {
       query.disabilityStatus = req.query.disabilityStatus
     }
+    if (req.query.formStatus) {
+      query.formStatus = req.query.formStatus
+    }
+
+    // 只有當有明確的 是/否 值時才加入查詢條件
     if (req.query.indigenousStatus !== undefined) {
-      query.indigenousStatus = req.query.indigenousStatus === 'true'
+      // 使用 JSON.parse 來正確解析字串 "true"/"false" 為 Boolean
+      query.indigenousStatus = JSON.parse(req.query.indigenousStatus)
+    }
+
+    if (req.query.tourManager !== undefined) {
+      query.tourManager = JSON.parse(req.query.tourManager)
+    }
+
+    // 處理日期範圍查詢
+    if (req.query.dateType && req.query.startDate && req.query.endDate) {
+      const startDate = new Date(req.query.startDate)
+      const endDate = new Date(req.query.endDate)
+      if (startDate.toDateString() === endDate.toDateString()) {
+        endDate.setHours(23, 59, 59, 999)
+      }
+      query[req.query.dateType] = { $gte: startDate, $lte: endDate }
     }
 
     // 處理快速搜尋
@@ -1707,8 +1723,7 @@ export const search = async (req, res) => {
         { IDNumber: searchRegex },
         { permanentAddress: searchRegex },
         { contactAddress: searchRegex },
-        { emergencyName: searchRegex },
-        { emergencyCellphone: searchRegex }
+        { note: searchRegex }
       ]
     }
 
