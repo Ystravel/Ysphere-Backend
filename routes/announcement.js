@@ -16,40 +16,35 @@ import announcementUpload from '../middlewares/announcementUpload.js'
 const router = Router()
 
 // 公開路由（需要登入但不需要特定權限）
-router.get('/home', auth.jwt, getHomeAnnouncements) // 獲取首頁公告列表
-router.get('/:id', auth.jwt, getOne) // 獲取單一公告詳情
+router.get('/home', auth.jwt, getHomeAnnouncements)
+router.get('/:id', auth.jwt, getOne)
+router.get('/all', auth.jwt, getAll)
 
-// 需要特定權限的路由
-// HR, ADMIN, SUPER_ADMIN 可以管理公告
+// 需要管理權限的路由 (ADMIN 或以上)
 router.post('/',
   auth.jwt,
-  checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER]),
+  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
   announcementUpload,
   create
 )
 
-router.get('/all',
-  auth.jwt,
-  getAll
-)
-
 router.patch('/:id',
   auth.jwt,
-  checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER]),
+  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
   announcementUpload,
   update
 )
 
 router.delete('/:id',
   auth.jwt,
-  checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER]),
+  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
   remove
 )
 
 // 附件管理路由
 router.delete('/:id/attachments/:attachmentId',
   auth.jwt,
-  checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER]),
+  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
   deleteAttachment
 )
 
