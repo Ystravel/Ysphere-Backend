@@ -12,6 +12,7 @@ import routeDepartment from './routes/department.js'
 import routeAuditLog from './routes/auditLog.js'
 import routeServiceTicket from './routes/serviceTicket.js'
 import routeTempUser from './routes/tempUser.js'
+// import routeAnnouncement from './routes/announcement.js'
 // passport
 import './passport/passport.js'
 
@@ -50,6 +51,7 @@ app.use('/department', routeDepartment)
 app.use('/auditLog', routeAuditLog)
 app.use('/serviceTicket', routeServiceTicket)
 app.use('/tempUser', routeTempUser)
+// app.use('/announcement', routeAnnouncement)
 
 app.all('*', (req, res) => {
   res.status(StatusCodes.NOT_FOUND).json({
