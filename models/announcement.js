@@ -27,7 +27,7 @@ const announcementSchema = new Schema({
   },
   deleteDate: {
     type: Date,
-    default: null
+    default: undefined
   },
   attachments: [{
     url: String,

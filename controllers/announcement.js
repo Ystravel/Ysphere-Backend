@@ -8,7 +8,6 @@ import mongoose from 'mongoose'
 // 創建公告
 export const create = async (req, res) => {
   try {
-    // 處理上傳的附件
     const attachments = req.files?.map(file => ({
       url: file.path,
       publicId: file.filename,
@@ -17,11 +16,21 @@ export const create = async (req, res) => {
       fileFormat: file.mimetype.split('/')[1]
     })) || []
 
-    const announcement = await Announcement.create({
+    // 處理日期
+    const announcementData = {
       ...req.body,
       author: req.user._id,
-      attachments
-    })
+      department: req.user.department,
+      attachments,
+      deleteDate: req.body.deleteDate || undefined
+    }
+
+    // 使用目前登入使用者的資訊
+    const announcement = await Announcement.create(announcementData)
+
+    const populatedAnnouncement = await Announcement.findById(announcement._id)
+      .populate('author', 'name userId')
+      .populate('department', 'name')
 
     // 记录操作日志
     await AuditLog.create({
@@ -44,10 +53,6 @@ export const create = async (req, res) => {
         }
       }
     })
-
-    const populatedAnnouncement = await Announcement.findById(announcement._id)
-      .populate('author', 'name userId')
-      .populate('department', 'name')
 
     res.status(StatusCodes.OK).json({
       success: true,

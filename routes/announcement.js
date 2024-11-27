@@ -16,9 +16,9 @@ import announcementUpload from '../middlewares/announcementUpload.js'
 const router = Router()
 
 // 公開路由（需要登入但不需要特定權限）
+router.get('/all', auth.jwt, getAll)
 router.get('/home', auth.jwt, getHomeAnnouncements)
 router.get('/:id', auth.jwt, getOne)
-router.get('/all', auth.jwt, getAll)
 
 // 需要管理權限的路由 (ADMIN 或以上)
 router.post('/',
