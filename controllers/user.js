@@ -707,8 +707,6 @@ export const getAll = async (req, res) => {
       query.indigenousStatus = req.query.indigenousStatus === 'true'
     }
 
-    console.log('Final query:', JSON.stringify(query, null, 2))
-
     const result = await User.find(query)
       .populate('company', 'name companyId')
       .populate('department', 'name departmentId')
@@ -1726,8 +1724,6 @@ export const search = async (req, res) => {
         { note: searchRegex }
       ]
     }
-
-    console.log('Final query:', JSON.stringify(query, null, 2))
 
     const sortField = req.query.sortBy || 'userId'
     const sortOrder = req.query.sortOrder === 'desc' ? -1 : 1

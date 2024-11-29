@@ -19,7 +19,7 @@ const auditLogSchema = new Schema({
   },
   targetModel: {
     type: String,
-    enum: ['users', 'departments', 'assets', 'companies', 'tempUsers', 'announcements'],
+    enum: ['users', 'departments', 'assets', 'companies', 'tempUsers', 'announcements', 'formTemplates', 'forms'],
     required: true
   },
   operatorInfo: {
@@ -30,7 +30,8 @@ const auditLogSchema = new Schema({
     name: String,
     userId: String,
     departmentId: String,
-    companyId: String
+    companyId: String,
+    formNumber: String
   },
   changes: {
     type: Object, // 改為 Object 類型而不是 Map

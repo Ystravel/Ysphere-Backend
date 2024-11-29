@@ -14,6 +14,9 @@ import routeServiceTicket from './routes/serviceTicket.js'
 import routeTempUser from './routes/tempUser.js'
 import routeExcelImport from './routes/excelImport.js'
 import routeAnnouncement from './routes/announcement.js'
+import routeFormTemplate from './routes/formTemplate.js'
+import routeForm from './routes/form.js'
+
 // passport
 import './passport/passport.js'
 
@@ -54,6 +57,8 @@ app.use('/serviceTicket', routeServiceTicket)
 app.use('/tempUser', routeTempUser)
 app.use('/excelImport', routeExcelImport)
 app.use('/announcement', routeAnnouncement)
+app.use('/formTemplates', routeFormTemplate)
+app.use('/forms', routeForm)
 
 app.all('*', (req, res) => {
   res.status(StatusCodes.NOT_FOUND).json({
@@ -61,6 +66,7 @@ app.all('*', (req, res) => {
     message: '找不到路由'
   })
 })
+
 app.listen(process.env.PORT || 4001, async () => {
   console.log('伺服器啟動')
   await mongoose.connect(process.env.DB_URI)
