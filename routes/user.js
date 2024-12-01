@@ -17,7 +17,8 @@ import {
   getSuggestions,
   sendInitialPassword,
   revealSystem,
-  search
+  search,
+  getBasicInfo
 } from '../controllers/user.js'
 import * as auth from '../middlewares/auth.js'
 import checkRole from '../middlewares/checkRole.js'
@@ -44,6 +45,7 @@ router.get('/profile', auth.jwt, profile)
 router.get('/employee-stats', auth.jwt, checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN]), getEmployeeStats)
 router.get('/suggestions', auth.jwt, checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.IT]), getSuggestions)
 router.get('/search', auth.jwt, checkRole([UserRole.HR, UserRole.ADMIN, UserRole.SUPER_ADMIN]), search)
+router.get('/basic-info', auth.jwt, getBasicInfo)
 
 // 用戶登出
 router.delete('/logout', auth.jwt, logout)

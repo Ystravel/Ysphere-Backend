@@ -59,7 +59,7 @@ router.delete('/:id',
 // 取得單個表單模板
 router.get('/:id',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER]),
   getById
 )
 

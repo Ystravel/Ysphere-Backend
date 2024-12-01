@@ -1816,3 +1816,41 @@ const handleError = (res, error) => {
     })
   }
 }
+
+// 修改控制器函數 - 提供所有員工可查看的基本資料
+export const getBasicInfo = async (req, res) => {
+  try {
+    const users = await User.find(
+      {}, // 不限制查詢條件,讓前端組件自行過濾
+      {
+        name: 1, // 姓名
+        englishName: 1, // 英文名
+        userId: 1, // 員工編號
+        department: 1, // 部門
+        company: 1, // 公司
+        extNumber: 1, // 分機號碼
+        birthDate: 1, // 生日
+        cellphone: 1, // 手機
+        employmentStatus: 1, // 在職狀態
+        avatar: 1 // 大頭貼
+      }
+    )
+      .populate('company', 'name companyId')
+      .populate('department', 'name departmentId')
+
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: '',
+      result: {
+        data: users
+      }
+    })
+  } catch (error) {
+    console.error('Get basic info error:', error)
+    res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+      success: false,
+      message: '獲取基本資料時發生錯誤',
+      error: error.message
+    })
+  }
+}

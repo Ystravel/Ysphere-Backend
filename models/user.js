@@ -175,6 +175,7 @@ const schema = new Schema({
     type: String,
     sparse: true,
     unique: true,
+    uppercase: true,
     set: v => (v === '' ? null : v)
   },
   employmentStatus: {

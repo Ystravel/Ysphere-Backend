@@ -21,7 +21,7 @@ router.get('/',
 
 router.delete('/:id',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER]),
   remove
 )
 

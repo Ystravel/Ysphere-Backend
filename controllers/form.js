@@ -12,25 +12,18 @@ export const getNextNumber = async (req, res) => {
     const currentDate = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
     const currentMonth = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}`
 
-    // 查找當月最大的單號
+    // 查找當月最大的流水號
     const latestForm = await Form.findOne({
       formNumber: new RegExp(`^${currentMonth}`)
     }).sort({ formNumber: -1 })
 
     let nextNumber
     if (latestForm) {
-      // 如果有找到，檢查是否為同一天
-      const latestDate = latestForm.formNumber.slice(0, 8) // 取前8位數字(年月日)
-      if (latestDate === currentDate) {
-        // 如果是同一天，序號加1
-        const currentSeq = parseInt(latestForm.formNumber.slice(-4))
-        nextNumber = `${currentDate}${String(currentSeq + 1).padStart(4, '0')}`
-      } else {
-        // 如果不是同一天，從0001開始
-        nextNumber = `${currentDate}0001`
-      }
+      // 如果當月有資料，取最後4位數字(流水號)加1
+      const currentSeq = parseInt(latestForm.formNumber.slice(-4))
+      nextNumber = `${currentDate}${String(currentSeq + 1).padStart(4, '0')}`
     } else {
-      // 如果該月沒有資料，從0001開始
+      // 如果當月沒有資料，從0001開始
       nextNumber = `${currentDate}0001`
     }
 
