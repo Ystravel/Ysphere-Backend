@@ -17,14 +17,15 @@ import path, { dirname } from 'path'
 import { v2 as cloudinary } from 'cloudinary'
 
 const transporter = nodemailer.createTransport({
-  service: 'Gmail',
+  // service: 'Gmail',
+  host: 'mail.ys7029.com', // 外寄伺服器主機地址
+  port: 465, // SMTP 埠號，465 為 SSL/TLS
+  secure: true, // 使用 SSL/TLS
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  secure: true,
-  tls: {
-    rejectUnauthorized: false
+    // user: process.env.EMAIL_USER,
+    // pass: process.env.EMAIL_PASS
+    user: 'ysphere-eip@ys7029.com', // 您的完整電子郵件地址
+    pass: 'Ystravel_0601' // 您的 cPanel 密碼
   }
 })
 
@@ -1355,7 +1356,7 @@ export const forgotPassword = async (req, res) => {
     const resetUrl = `${process.env.FRONTEND_URL}/#/reset-password/${resetToken}`
 
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: 'ysphere-eip@ys7029.com',
       to: user.email,
       subject: 'Ysphere - 永信星球 密碼重置請求',
       html: `
@@ -1567,7 +1568,7 @@ export const sendInitialPassword = async (req, res) => {
 
     // 發送郵件
     const mailOptions = {
-      from: process.env.EMAIL_USER,
+      from: 'ysphere-eip@ys7029.com',
       to: user.email,
       subject: 'Ysphere - 永信星球 系統初始密碼',
       html: `
