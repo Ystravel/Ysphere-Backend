@@ -14,7 +14,7 @@ import crypto from 'crypto'
 import nodemailer from 'nodemailer'
 import { fileURLToPath } from 'url'
 import path, { dirname } from 'path'
-import { v2 as cloudinary } from 'cloudinary'
+import fs from 'fs'
 
 const transporter = nodemailer.createTransport({
   // service: 'Gmail',
@@ -1499,7 +1499,7 @@ export const resetPassword = async (req, res) => {
 // 更新用戶頭像
 export const updateAvatar = async (req, res) => {
   try {
-    if (!req.file || !req.file.path) {
+    if (!req.file) {
       return res.status(StatusCodes.BAD_REQUEST).json({
         success: false,
         message: '未提供頭像文件'
@@ -1515,18 +1515,23 @@ export const updateAvatar = async (req, res) => {
     }
 
     // 如果用戶有舊頭像且不是默認頭像，則刪除
-    if (user.avatar && !user.avatar.includes('multiavatar')) {
-      // 從 Cloudinary URL 中提取 public_id
-      const publicId = user.avatar.split('/').pop().split('.')[0]
+    if (user.avatar && !user.avatar.includes('avatar_robot')) {
+      const oldAvatarPath = path.join(process.env.UPLOAD_PATH, 'avatars', path.basename(user.avatar))
       try {
-        await cloudinary.uploader.destroy(`avatars/${publicId}`)
+        if (fs.existsSync(oldAvatarPath)) {
+          fs.unlinkSync(oldAvatarPath)
+          console.log('Deleted old avatar:', oldAvatarPath)
+        }
       } catch (error) {
-        console.error('刪除舊頭像失敗:', error)
-        // 即使刪除舊頭像失敗，我們仍然繼續更新新頭像
+        console.error('Delete old avatar error:', error)
       }
     }
 
-    user.avatar = req.file.path // 更新用戶的頭像URL
+    // 更新用戶頭像 URL
+    const avatarUrl = `${process.env.UPLOAD_URL}/avatars/${req.file.filename}`
+    console.log('New avatar URL:', avatarUrl)
+
+    user.avatar = avatarUrl
     await user.save()
 
     res.status(StatusCodes.OK).json({
@@ -1535,7 +1540,7 @@ export const updateAvatar = async (req, res) => {
       result: user.avatar
     })
   } catch (error) {
-    console.error('更新頭像錯誤:', error)
+    console.error('Update avatar error:', error)
     res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
       success: false,
       message: '更新頭像失敗'

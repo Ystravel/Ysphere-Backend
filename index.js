@@ -49,6 +49,8 @@ app.use((_, req, res, next) => {
 
 app.use(mongoSanitize())
 
+app.use('/uploads', express.static(process.env.UPLOAD_PATH))
+
 app.use('/user', routeUser)
 app.use('/company', routeCompany)
 app.use('/department', routeDepartment)
