@@ -2,6 +2,7 @@ import FormTemplate from '../models/formTemplate.js'
 import Form from '../models/form.js'
 import { StatusCodes } from 'http-status-codes'
 import AuditLog from '../models/auditLog.js'
+import Company from '../models/company.js'
 
 // 創建表單模板
 export const create = async (req, res) => {
@@ -30,6 +31,12 @@ export const create = async (req, res) => {
       componentName: req.body.componentName
     })
 
+    // 獲取公司資訊
+    const companyData = await Company.findById(req.body.company)
+    if (!companyData) {
+      throw new Error('找不到公司資料')
+    }
+
     // 記錄審計日誌
     await AuditLog.create({
       operatorId: req.user._id,
@@ -50,7 +57,7 @@ export const create = async (req, res) => {
         },
         所屬公司: {
           from: null,
-          to: result.company
+          to: companyData.name
         },
         表單類型: {
           from: null,
@@ -171,10 +178,19 @@ export const edit = async (req, res) => {
     const result = await FormTemplate.findByIdAndUpdate(
       req.params.id,
       {
-        name: req.body.name
+        name: req.body.name,
+        company: req.body.company,
+        type: req.body.type,
+        componentName: req.body.componentName
       },
       { new: true, runValidators: true }
     )
+
+    // 獲取新舊公司資訊
+    const [originalCompany, newCompany] = await Promise.all([
+      Company.findById(original.company),
+      Company.findById(req.body.company)
+    ])
 
     // 記錄審計日誌
     await AuditLog.create({
@@ -193,6 +209,18 @@ export const edit = async (req, res) => {
         表單名稱: {
           from: original.name,
           to: result.name
+        },
+        所屬公司: {
+          from: originalCompany?.name || '未知公司',
+          to: newCompany?.name || '未知公司'
+        },
+        表單類型: {
+          from: original.type,
+          to: result.type
+        },
+        組件名稱: {
+          from: original.componentName,
+          to: result.componentName
         }
       }
     })

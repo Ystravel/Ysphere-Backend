@@ -1,9 +1,10 @@
 import Form from '../models/form.js'
 import { StatusCodes } from 'http-status-codes'
-import { v2 as cloudinary } from 'cloudinary'
 import AuditLog from '../models/auditLog.js'
 import FormTemplate from '../models/formTemplate.js'
 import mongoose from 'mongoose'
+import path from 'path'
+import fs from 'fs'
 
 // 取得下一個表單編號
 export const getNextNumber = async (req, res) => {
@@ -51,8 +52,8 @@ export const create = async (req, res) => {
       formNumber: req.body.formNumber,
       formTemplate: req.body.formTemplate,
       creator: req.user._id,
-      pdfUrl: req.body.pdfUrl,
-      cloudinaryPublicId: req.body.cloudinaryPublicId
+      pdfUrl: req.body.pdfUrl
+      // cloudinaryPublicId: req.body.cloudinaryPublicId
     })
     console.log('創建成功:', result)
 
@@ -232,12 +233,23 @@ export const remove = async (req, res) => {
   try {
     const result = await Form.findById(req.params.id)
     if (!result) throw new Error('NOT_FOUND')
+    // // 從 PDF URL 中提取 public_id
+    //     const publicId = result.pdfUrl.split('/').slice(-2).join('/')
+    // 從 URL 中提取檔案名稱
+    const filename = path.basename(result.pdfUrl)
+    const filePath = path.join(process.env.UPLOAD_PATH, 'forms', filename)
 
-    // 從 PDF URL 中提取 public_id
-    const publicId = result.pdfUrl.split('/').slice(-2).join('/')
+    // 刪除實體檔案
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath)
+      }
+    } catch (error) {
+      console.error('刪除檔案失敗:', error)
+    }
 
-    // 刪除 Cloudinary 上的 PDF 檔案
-    await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' })
+    // // 刪除 Cloudinary 上的 PDF 檔案
+    // await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' })
     await result.deleteOne()
 
     // 記錄審計日誌

@@ -1131,14 +1131,12 @@ export const edit = async (req, res) => {
           toValue = newValue ? '是' : '否'
         }
       } else if (originalValue instanceof Date || (typeof newValue === 'string' && /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}\.\d{3}Z)?$/.test(newValue))) {
-        // 處理 Date 對象和 'YYYY-MM-DD' 或 'YYYY-MM-DDTHH:mm:ss.sssZ' 格式的字符串
+        // 修改日期處理邏輯
         try {
-          const originalDate = originalValue instanceof Date ? originalValue : new Date(originalValue)
-          const newDate = typeof newValue === 'string' && /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}\.\d{3}Z)?$/.test(newValue) ? new Date(newValue) : new Date(newValue)
+          const fromDateStr = originalValue ? formatDateForAuditLog(originalValue) : null
+          const toDateStr = newValue ? formatDateForAuditLog(new Date(newValue)) : null
 
-          const fromDateStr = originalDate ? formatDateForAuditLog(originalDate) : null
-          const toDateStr = newDate ? formatDateForAuditLog(newDate) : null
-
+          // 只有當值真正改變時才記錄變更
           if (fromDateStr !== toDateStr) {
             hasChanged = true
             fromValue = fromDateStr
@@ -1146,7 +1144,6 @@ export const edit = async (req, res) => {
           }
         } catch (error) {
           console.error('日期處理錯誤:', error, '欄位:', key)
-          // 如果日期格式錯誤，跳過這個欄位
           return
         }
       } else if (key === 'dependentInsurance') {

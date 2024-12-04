@@ -1,10 +1,11 @@
-import { v2 as cloudinary } from 'cloudinary'
 import { StatusCodes } from 'http-status-codes'
 import ServiceTicket from '../models/serviceTicket.js'
 import validator from 'validator'
 import { getNextTicketNumber } from '../utils/sequence.js'
 import UserRole from '../enums/UserRole.js'
 import User from '../models/user.js'
+import path from 'path'
+import fs from 'fs'
 
 // 創建服務請求
 export const create = async (req, res) => {
@@ -34,7 +35,14 @@ export const create = async (req, res) => {
     // 如果創建失敗，需要刪除已上傳的圖片
     if (req.files) {
       for (const file of req.files) {
-        await cloudinary.uploader.destroy(file.filename)
+        const filePath = path.join(process.env.UPLOAD_PATH, 'tickets', file.filename)
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath)
+          }
+        } catch (error) {
+          console.error('刪除檔案失敗:', error)
+        }
       }
     }
     console.error('創建服務請求失敗:', error)
@@ -250,18 +258,32 @@ export const update = async (req, res) => {
 
     // 如果狀態改為已完成，且有附件需要刪除
     if (ticket.status === '已完成' && oldStatus !== '已完成' && ticket.attachments.length > 0) {
+      // 刪除所有附件檔案
       for (const attachment of ticket.attachments) {
-        await cloudinary.uploader.destroy(attachment.publicId)
+        const filePath = path.join(process.env.UPLOAD_PATH, 'tickets', attachment.publicId)
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath)
+          }
+        } catch (error) {
+          console.error('刪除檔案失敗:', error)
+        }
       }
+      // 清空附件列表
       ticket.attachments = []
     }
 
     await ticket.save()
 
+    // 重新獲取並填充用戶資訊
+    const updatedTicket = await ServiceTicket.findById(ticket._id)
+      .populate('requesterId', 'name userId extNumber')
+      .populate('assigneeId', 'name userId')
+
     res.status(StatusCodes.OK).json({
       success: true,
       message: '服務請求更新成功',
-      result: ticket
+      result: updatedTicket
     })
   } catch (error) {
     console.error('更新服務請求失敗:', error)
@@ -301,27 +323,38 @@ export const deleteImage = async (req, res) => {
 
   try {
     console.log('收到的 Ticket ID:', ticketId)
-    console.log('收到的圖片 Public ID:', publicId)
+    console.log('收到的圖片檔名:', publicId)
 
     const ticket = await ServiceTicket.findById(ticketId)
     if (!ticket) {
       return res.status(404).json({ success: false, message: '找不到該服務請求' })
     }
 
-    const fullPublicId = `tickets/${publicId}`
+    // 找到要刪除的圖片
+    const imageToDelete = ticket.attachments.find(att => att.publicId === publicId)
+    if (!imageToDelete) {
+      return res.status(404).json({ success: false, message: '找不到該圖片' })
+    }
 
-    // 使用 MongoDB 的 $pull 操作符直接更新文檔
+    // 刪除實體檔案
+    const filePath = path.join(process.env.UPLOAD_PATH, 'tickets', publicId)
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath)
+      }
+    } catch (error) {
+      console.error('刪除檔案失敗:', error)
+    }
+
+    // 從資料庫中移除圖片記錄
     await ServiceTicket.findByIdAndUpdate(
       ticketId,
       {
         $pull: {
-          attachments: { publicId: fullPublicId }
+          attachments: { publicId }
         }
       }
     )
-
-    // 從 Cloudinary 刪除圖片
-    await cloudinary.uploader.destroy(fullPublicId)
 
     res.status(200).json({ success: true, message: '圖片刪除成功' })
   } catch (error) {
@@ -343,7 +376,14 @@ export const deleteTicket = async (req, res) => {
 
     // 刪除附件
     for (const attachment of ticket.attachments) {
-      await cloudinary.uploader.destroy(attachment.publicId)
+      const filePath = path.join(process.env.UPLOAD_PATH, 'tickets', attachment.publicId)
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath)
+        }
+      } catch (error) {
+        console.error('刪除檔案失敗:', error)
+      }
     }
 
     await ServiceTicket.findByIdAndDelete(id)
@@ -501,11 +541,20 @@ export const updateStatus = async (req, res) => {
       ticket.assigneeId = req.user._id
     }
 
-    // 處理附件
+    // 如果狀態改為已完成，且有附件需要刪除
     if (req.body.status === '已完成' && ticket.attachments.length > 0) {
+      // 刪除所有附件檔案
       for (const attachment of ticket.attachments) {
-        await cloudinary.uploader.destroy(attachment.publicId)
+        const filePath = path.join(process.env.UPLOAD_PATH, 'tickets', attachment.publicId)
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath)
+          }
+        } catch (error) {
+          console.error('刪除檔案失敗:', error)
+        }
       }
+      // 清空附件列表
       ticket.attachments = []
     }
 

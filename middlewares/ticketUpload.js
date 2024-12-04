@@ -1,21 +1,22 @@
 // ticketUpload.js
 import multer from 'multer'
-import { v2 as cloudinary } from 'cloudinary'
-import { CloudinaryStorage } from 'multer-storage-cloudinary'
+import path from 'path'
+import fs from 'fs'
 
-// 配置 Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_NAME,
-  api_key: process.env.CLOUDINARY_KEY,
-  api_secret: process.env.CLOUDINARY_SECRET
-})
-
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'tickets', // 存在 tickets 資料夾
-    allowed_formats: ['jpg', 'png', 'jpeg', 'webp'], // 允許的格式
-    transformation: [{ width: 800, height: 800, crop: 'limit' }] // 限制最大尺寸，保持原比例
+// 設定存儲位置
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = path.join(process.env.UPLOAD_PATH, 'tickets')
+    // 確保目錄存在
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true })
+    }
+    cb(null, uploadPath)
+  },
+  filename: function (req, file, cb) {
+    // 生成檔案名稱: 時間戳_原始檔名
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+    cb(null, uniqueSuffix + path.extname(file.originalname))
   }
 })
 
@@ -64,6 +65,14 @@ export default (req, res, next) => {
         message: '未知錯誤'
       })
     }
+
+    // 設定檔案的完整 URL
+    if (req.files) {
+      req.files.forEach(file => {
+        file.path = `${process.env.UPLOAD_URL}/tickets/${file.filename}`
+      })
+    }
+
     next()
   })
 }
