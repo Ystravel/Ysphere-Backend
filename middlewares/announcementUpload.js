@@ -1,26 +1,20 @@
 import multer from 'multer'
-import { v2 as cloudinary } from 'cloudinary'
-import { CloudinaryStorage } from 'multer-storage-cloudinary'
+import path from 'path'
+import fs from 'fs'
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_NAME,
-  api_key: process.env.CLOUDINARY_KEY,
-  api_secret: process.env.CLOUDINARY_SECRET
-})
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(process.env.UPLOAD_PATH, 'announcements')
 
-const storage = new CloudinaryStorage({
-  cloudinary,
-  params: {
-    folder: 'announcements',
-    resource_type: 'auto', // 允許上傳各種類型的文件
-    allowed_formats: [
-      // 圖片格式
-      'jpg', 'jpeg', 'png', 'gif', 'webp',
-      // 文件格式
-      'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
-      // 壓縮檔
-      'zip', 'rar'
-    ]
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true })
+    }
+    cb(null, uploadDir)
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9)
+    const filename = uniqueSuffix + path.extname(file.originalname).toLowerCase()
+    cb(null, filename)
   }
 })
 
@@ -86,6 +80,18 @@ export default (req, res, next) => {
         message: '未知錯誤'
       })
     }
+
+    // 處理上傳的文件
+    if (req.files) {
+      req.files = req.files.map(file => ({
+        path: file.path.replace(/\\/g, '/'),
+        filename: file.originalname,
+        fileType: file.mimetype.split('/')[0],
+        mimeType: file.mimetype,
+        size: file.size
+      }))
+    }
+
     next()
   })
 }

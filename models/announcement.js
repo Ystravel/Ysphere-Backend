@@ -17,24 +17,27 @@ const announcementSchema = new Schema({
   },
   department: {
     type: ObjectId,
-    ref: 'departments',
-    required: [true, '請選擇發布部門']
+    ref: 'departments'
   },
   author: {
     type: ObjectId,
     ref: 'users',
-    required: [true, '請選擇發布者']
+    required: true
+  },
+  expiryDate: {
+    type: Date,
+    default: null
   },
   deleteDate: {
     type: Date,
-    default: undefined
+    default: null
   },
   attachments: [{
-    url: String,
-    publicId: String,
-    filename: String,
-    fileType: String,
-    fileFormat: String,
+    path: String, // 文件在服務器上的路徑
+    filename: String, // 原始文件名
+    fileType: String, // 文件類型 (例如: 'image', 'document')
+    mimeType: String, // MIME 類型
+    size: Number, // 文件大小（bytes）
     uploadDate: {
       type: Date,
       default: Date.now
@@ -49,5 +52,6 @@ const announcementSchema = new Schema({
 announcementSchema.index({ title: 'text', content: 'text' })
 announcementSchema.index({ type: 1, createdAt: -1 })
 announcementSchema.index({ deleteDate: 1 })
+announcementSchema.index({ expiryDate: 1 })
 
 export default model('announcements', announcementSchema)

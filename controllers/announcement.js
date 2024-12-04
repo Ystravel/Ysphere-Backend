@@ -22,7 +22,7 @@ export const create = async (req, res) => {
       author: req.user._id,
       department: req.user.department,
       attachments,
-      deleteDate: req.body.deleteDate || undefined
+      expiryDate: req.body.expiryDate || undefined
     }
 
     // 使用目前登入使用者的資訊
@@ -89,8 +89,11 @@ export const getAll = async (req, res) => {
 
     const query = {}
 
-    // 只查詢未刪除的公告
-    query.deleteDate = { $gt: new Date() }
+    // 只查詢未過期的公告或沒有設置過期時間的公告
+    query.$or = [
+      { expiryDate: { $gt: new Date() } },
+      { expiryDate: null }
+    ]
 
     if (type) query.type = type
     if (department) query.department = new mongoose.Types.ObjectId(department)
@@ -368,7 +371,7 @@ export const remove = async (req, res) => {
 export const getHomeAnnouncements = async (req, res) => {
   try {
     const query = {
-      deleteDate: { $gt: new Date() }
+      expiryDate: { $gt: new Date() }
     }
 
     const announcements = await Announcement.aggregate([
