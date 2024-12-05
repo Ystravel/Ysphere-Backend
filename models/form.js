@@ -5,6 +5,9 @@ const formSchema = new Schema({
     type: String,
     required: [true, '請輸入表單編號']
   },
+  clientName: {
+    type: String
+  },
   formTemplate: {
     type: Schema.Types.ObjectId,
     ref: 'formTemplates',

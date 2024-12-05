@@ -23,28 +23,28 @@ router.get('/:id', auth.jwt, getOne)
 // 需要管理權限的路由 (ADMIN 或以上)
 router.post('/',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.HR]),
   announcementUpload,
   create
 )
 
 router.patch('/:id',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.HR]),
   announcementUpload,
   update
 )
 
 router.delete('/:id',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.HR]),
   remove
 )
 
 // 附件管理路由
 router.delete('/:id/attachments/:attachmentId',
   auth.jwt,
-  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+  checkRole([UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER, UserRole.HR]),
   deleteAttachment
 )
 

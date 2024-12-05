@@ -83,8 +83,7 @@ export const getAll = async (req, res) => {
       limit = 10,
       type,
       search,
-      department,
-      sortBy = '-createdAt'
+      department
     } = req.query
 
     const query = {}
@@ -114,19 +113,19 @@ export const getAll = async (req, res) => {
           from: 'users',
           localField: 'author',
           foreignField: '_id',
-          as: 'authorInfo'
+          as: 'author'
         }
       },
-      { $unwind: '$authorInfo' },
+      { $unwind: '$author' },
       {
         $lookup: {
           from: 'departments',
           localField: 'department',
           foreignField: '_id',
-          as: 'departmentInfo'
+          as: 'department'
         }
       },
-      { $unwind: '$departmentInfo' },
+      { $unwind: '$department' },
       {
         $addFields: {
           sortOrder: {
@@ -144,9 +143,27 @@ export const getAll = async (req, res) => {
         }
       },
       {
+        $project: {
+          _id: 1,
+          title: 1,
+          content: 1,
+          type: 1,
+          createdAt: 1,
+          expiryDate: 1,
+          attachments: 1,
+          'author._id': 1,
+          'author.name': 1,
+          'author.userId': 1,
+          'department._id': 1,
+          'department.name': 1,
+          'department.departmentId': 1,
+          sortOrder: 1
+        }
+      },
+      {
         $sort: {
           sortOrder: -1,
-          [sortBy.replace('-', '')]: sortBy.startsWith('-') ? -1 : 1
+          createdAt: -1
         }
       },
       {

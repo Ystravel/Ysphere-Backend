@@ -48,16 +48,39 @@ export const create = async (req, res) => {
     console.log('收到創建請求')
     console.log('請求資料:', req.body)
 
+    // 1. 先檢查單號是否重複
+    const existingForm = await Form.findOne({ formNumber: req.body.formNumber })
+    if (existingForm) {
+      // 如果發現單號重複，刪除已上傳的 PDF 檔案
+      if (req.body.pdfUrl) {
+        const filename = path.basename(req.body.pdfUrl)
+        const filePath = path.join(process.env.UPLOAD_PATH, 'forms', filename)
+        try {
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath)
+            console.log('已刪除重複單號的 PDF 檔案:', filePath)
+          }
+        } catch (error) {
+          console.error('刪除 PDF 檔案失敗:', error)
+        }
+      }
+
+      return res.status(StatusCodes.CONFLICT).json({
+        success: false,
+        message: '表單編號已存在'
+      })
+    }
+
+    // 2. 創建表單
     const result = await Form.create({
       formNumber: req.body.formNumber,
+      clientName: req.body.clientName,
       formTemplate: req.body.formTemplate,
       creator: req.user._id,
       pdfUrl: req.body.pdfUrl
-      // cloudinaryPublicId: req.body.cloudinaryPublicId
     })
-    console.log('創建成功:', result)
 
-    // 記錄審計日誌
+    // 3. 記錄審計日誌
     await AuditLog.create({
       operatorId: req.user._id,
       operatorInfo: {
@@ -75,6 +98,10 @@ export const create = async (req, res) => {
           from: null,
           to: result.formNumber
         },
+        客戶名稱: {
+          from: null,
+          to: result.clientName
+        },
         PDF檔案: {
           from: null,
           to: result.pdfUrl
@@ -88,6 +115,20 @@ export const create = async (req, res) => {
       result
     })
   } catch (error) {
+    // 如果創建失敗，也要刪除已上傳的 PDF 檔案
+    if (req.body.pdfUrl) {
+      const filename = path.basename(req.body.pdfUrl)
+      const filePath = path.join(process.env.UPLOAD_PATH, 'forms', filename)
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath)
+          console.log('已刪除失敗的 PDF 檔案:', filePath)
+        }
+      } catch (deleteError) {
+        console.error('刪除 PDF 檔案失敗:', deleteError)
+      }
+    }
+
     console.error('創建失敗:', error)
     if (error.name === 'ValidationError') {
       const key = Object.keys(error.errors)[0]
@@ -162,10 +203,22 @@ export const search = async (req, res) => {
       }
     }
 
+    // 添加快速搜尋功能
+    if (req.query.quickSearch) {
+      const searchRegex = new RegExp(req.query.quickSearch, 'i')
+      query.$or = [
+        { formNumber: searchRegex },
+        { clientName: searchRegex }
+      ]
+    }
+
     console.log('最終查詢條件:', query)
 
-    // 使用 aggregate 來處理複雜查詢，加入分頁
-    const [result] = await Form.aggregate([
+    // 設置排序
+    const sortField = req.query.sort || 'formNumber'
+    const sortOrder = req.query.order === 'desc' ? -1 : 1
+
+    const pipeline = [
       { $match: query },
       {
         $lookup: {
@@ -175,7 +228,7 @@ export const search = async (req, res) => {
           as: 'formTemplate'
         }
       },
-      { $unwind: '$formTemplate' },
+      { $unwind: { path: '$formTemplate', preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
           from: 'companies',
@@ -184,7 +237,7 @@ export const search = async (req, res) => {
           as: 'formTemplate.company'
         }
       },
-      { $unwind: '$formTemplate.company' },
+      { $unwind: { path: '$formTemplate.company', preserveNullAndEmptyArrays: true } },
       {
         $lookup: {
           from: 'users',
@@ -193,8 +246,8 @@ export const search = async (req, res) => {
           as: 'creator'
         }
       },
-      { $unwind: '$creator' },
-      { $sort: { createdAt: -1 } },
+      { $unwind: { path: '$creator', preserveNullAndEmptyArrays: true } },
+      { $sort: { [sortField]: sortOrder } },
       {
         $facet: {
           metadata: [{ $count: 'total' }],
@@ -204,7 +257,9 @@ export const search = async (req, res) => {
           ]
         }
       }
-    ])
+    ]
+
+    const [result] = await Form.aggregate(pipeline)
 
     const totalItems = result.metadata[0]?.total || 0
 
