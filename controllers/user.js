@@ -18,14 +18,12 @@ import fs from 'fs'
 
 const transporter = nodemailer.createTransport({
   // service: 'Gmail',
-  host: 'mail.ys7029.com', // 外寄伺服器主機地址
+  host: process.env.EMAIL_HOST, // 外寄伺服器主機地址
   port: 465, // SMTP 埠號，465 為 SSL/TLS
   secure: true, // 使用 SSL/TLS
   auth: {
-    // user: process.env.EMAIL_USER,
-    // pass: process.env.EMAIL_PASS
-    user: 'ysphere-eip@ys7029.com', // 您的完整電子郵件地址
-    pass: 'Ystravel_0601' // 您的 cPanel 密碼
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
   }
 })
 
@@ -466,7 +464,7 @@ export const googleLogin = async (req, res) => {
     const { code } = req.body
     const { tokens } = await oauth2Client.getToken(code)
     const idToken = tokens.id_token
-    const ticket = await oauth2Client.verifyIdToken({
+    const ticket = await oauth2Client.verifyIdToken({ // await要留著不然會有問題
       idToken,
       audience: process.env.GOOGLE_CLIENT_ID
     })
@@ -474,7 +472,6 @@ export const googleLogin = async (req, res) => {
     const payload = ticket.getPayload()
     const email = payload.email
 
-    // 修改这里：同时 populate company 和 department
     const user = await User.findOne({ email })
       .populate('company', 'name companyId')
       .populate('department', 'name departmentId')
@@ -1353,7 +1350,7 @@ export const forgotPassword = async (req, res) => {
     const resetUrl = `${process.env.FRONTEND_URL}/#/reset-password/${resetToken}`
 
     const mailOptions = {
-      from: 'ysphere-eip@ys7029.com',
+      from: process.env.EMAIL_USER,
       to: user.email,
       subject: 'Ysphere - 永信星球 密碼重置請求',
       html: `
@@ -1570,7 +1567,7 @@ export const sendInitialPassword = async (req, res) => {
 
     // 發送郵件
     const mailOptions = {
-      from: 'ysphere-eip@ys7029.com',
+      from: process.env.EMAIL_USER,
       to: user.email,
       subject: 'Ysphere - 永信星球 系統初始密碼',
       html: `
